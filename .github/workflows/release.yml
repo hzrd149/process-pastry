@@ -38,6 +38,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set repo name
+        shell: bash
+        run: |
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
+
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
         with:
@@ -48,24 +54,24 @@ jobs:
 
       - name: Build binary
         run: |
-          bun build index.ts --compile --target=bun-${{ matrix.target }} --outfile=nostr-code-snippets-${{ matrix.platform }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
+          bun build index.ts --compile --target=bun-${{ matrix.target }} --outfile=${{ env.REPO_NAME }}-${{ matrix.platform }}${{ matrix.os == 'windows-latest' && '.exe' || '' }}
 
       - name: Create tarball (Unix)
         if: matrix.os != 'windows-latest'
         run: |
-          tar -czf nostr-code-snippets-${{ matrix.platform }}.tar.gz nostr-code-snippets-${{ matrix.platform }}
+          tar -czf ${{ env.REPO_NAME }}-${{ matrix.platform }}.tar.gz ${{ env.REPO_NAME }}-${{ matrix.platform }}
 
       - name: Create zip (Windows)
         if: matrix.os == 'windows-latest'
         run: |
-          7z a nostr-code-snippets-${{ matrix.platform }}.zip nostr-code-snippets-${{ matrix.platform }}.exe
+          7z a ${{ env.REPO_NAME }}-${{ matrix.platform }}.zip ${{ env.REPO_NAME }}-${{ matrix.platform }}.exe
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: nostr-code-snippets-${{ matrix.platform }}
+          name: ${{ env.REPO_NAME }}-${{ matrix.platform }}
           path: |
-            nostr-code-snippets-${{ matrix.platform }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
+            ${{ env.REPO_NAME }}-${{ matrix.platform }}${{ matrix.os == 'windows-latest' && '.zip' || '.tar.gz' }}
 
   release:
     name: Create Release
@@ -77,6 +83,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Set repo name
+        shell: bash
+        run: |
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2)
+          echo "REPO_NAME=$REPO_NAME" >> $GITHUB_ENV
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -93,7 +105,7 @@ jobs:
           prerelease: false
           generate_release_notes: true
           files: |
-            ./artifacts/*/nostr-code-snippets-*.tar.gz
-            ./artifacts/*/nostr-code-snippets-*.zip
+            ./artifacts/*/${{ env.REPO_NAME }}-*.tar.gz
+            ./artifacts/*/${{ env.REPO_NAME }}-*.zip
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
