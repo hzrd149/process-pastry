@@ -19,6 +19,8 @@ export interface ServerOptions {
   exampleEnvPath?: string; // Path to .env.example file (auto-discovered if not provided)
   proxyPort?: number; // Port to proxy unmatched requests to (when custom HTML is provided)
   proxyHost?: string; // Host to proxy unmatched requests to (default: "localhost")
+  authUser?: string; // Username for HTTP Basic Auth (optional)
+  authPassword?: string; // Password for HTTP Basic Auth (optional)
 }
 
 export function startServer(options: ServerOptions): void {
@@ -31,6 +33,8 @@ export function startServer(options: ServerOptions): void {
     exampleEnvPath,
     proxyPort,
     proxyHost = "localhost",
+    authUser,
+    authPassword,
   } = options;
 
   // Initialize process manager
@@ -125,6 +129,55 @@ export function startServer(options: ServerOptions): void {
   function shouldRestart(req: Request): boolean {
     const restartHeader = req.headers.get("X-Restart-Process");
     return restartHeader !== "false";
+  }
+
+  // Helper function to check HTTP Basic Auth
+  function checkAuth(req: Request): Response | null {
+    // Skip auth if credentials are not provided
+    if (!authUser && !authPassword) {
+      return null;
+    }
+
+    // If only one credential is provided, require both
+    if (!authUser || !authPassword) {
+      return new Response("Unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": 'Basic realm="Config UI"',
+        },
+      });
+    }
+
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Basic ")) {
+      return new Response("Unauthorized", {
+        status: 401,
+        headers: {
+          "WWW-Authenticate": 'Basic realm="Config UI"',
+        },
+      });
+    }
+
+    try {
+      const base64Credentials = authHeader.substring(6);
+      const credentials = Buffer.from(base64Credentials, "base64").toString(
+        "utf-8",
+      );
+      const [username, password] = credentials.split(":", 2);
+
+      if (username === authUser && password === authPassword) {
+        return null; // Auth passed
+      }
+    } catch (error) {
+      // Invalid base64 or malformed credentials
+    }
+
+    return new Response("Unauthorized", {
+      status: 401,
+      headers: {
+        "WWW-Authenticate": 'Basic realm="Config UI"',
+      },
+    });
   }
 
   // Add API routes
@@ -254,6 +307,12 @@ export function startServer(options: ServerOptions): void {
     port,
     routes,
     async fetch(req) {
+      // Check authentication first (applies to all routes)
+      const authResponse = checkAuth(req);
+      if (authResponse) {
+        return authResponse;
+      }
+
       // If proxyPort is provided, proxy unmatched routes
       if (proxyPort) {
         const url = new URL(req.url);
@@ -286,6 +345,9 @@ export function startServer(options: ServerOptions): void {
   console.log(
     `${LOG_PREFIX} 🌐 UI available at http://localhost:${port}${htmlRoute}`,
   );
+  if (authUser && authPassword) {
+    console.log(`${LOG_PREFIX} 🔒 HTTP Basic Auth enabled`);
+  }
   if (proxyPort) {
     console.log(
       `${LOG_PREFIX} 🔀 Proxying unmatched requests to http://${proxyHost}:${proxyPort}`,

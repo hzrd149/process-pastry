@@ -8,7 +8,8 @@
   "scripts": {
     "format": "prettier -w .",
     "example": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --port 3000",
-    "example:proxy": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --html-route /config --proxy-port 8080"
+    "example:proxy": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --html-route /config --proxy-port 8080",
+    "example:auth": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --auth-user admin --auth-password password"
   },
   "bin": {
     "process-pastry": "./index.ts"

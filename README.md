@@ -13,6 +13,7 @@ A CLI tool built with Bun that provides a web-based configuration interface for 
 - ⏸️ **Skip Restart** - Optional header to save config without restarting the process
 - 📝 **Schema Support** - Optional `.env.example` file for variable descriptions and defaults
 - 🔀 **Request Proxying** - Proxy unmatched requests to another port when using custom UI
+- 🔒 **HTTP Basic Auth** - Optional authentication to protect the config UI and API endpoints
 
 ## Installation
 
@@ -45,6 +46,12 @@ bun run index.ts --cmd "node app.js" --html ./config-ui.html --html-route /confi
 
 # With custom proxy host and port
 bun run index.ts --cmd "node app.js" --proxy-port 8080 --proxy-host 192.168.1.100
+
+# With HTTP Basic Auth (protects all routes)
+bun run index.ts --cmd "node app.js" --auth-user admin --auth-password secret
+
+# With HTTP Basic Auth using environment variables
+PROCESS_PASTRY_AUTH_USER=admin PROCESS_PASTRY_AUTH_PASSWORD=secret bun run index.ts --cmd "node app.js"
 ```
 
 **Note:** If no `--html` option is provided, a default UI will be automatically served at the root route.
@@ -59,11 +66,15 @@ bun run index.ts --cmd "node app.js" --proxy-port 8080 --proxy-host 192.168.1.10
 - `--example-env, -E <path>` - Path to `.env.example` file (auto-discovered if not provided)
 - `--proxy-port <port>` - Port to proxy unmatched requests to
 - `--proxy-host <host>` - Host to proxy unmatched requests to (default: `localhost`)
+- `--auth-user <user>` - Username for HTTP Basic Auth (optional, can also use `PROCESS_PASTRY_AUTH_USER` env var)
+- `--auth-password <pass>` - Password for HTTP Basic Auth (optional, can also use `PROCESS_PASTRY_AUTH_PASSWORD` env var)
 - `--help` - Show help message
 
 ## API Endpoints
 
 The server provides the following REST API endpoints:
+
+**Note:** If HTTP Basic Auth is enabled (via `--auth-user` and `--auth-password` or environment variables), all API endpoints require authentication. Browsers will automatically prompt for credentials when accessing protected endpoints.
 
 ### `GET /process-pastry/api/config`
 
@@ -566,6 +577,41 @@ const response = await fetch("/process-pastry/api/config", {
 });
 ```
 
+#### HTTP Basic Authentication
+
+You can protect the config UI and all API endpoints with HTTP Basic Auth. When enabled, all routes (UI pages, static assets, and API endpoints) require authentication.
+
+**Using CLI arguments:**
+
+```bash
+bun run index.ts --cmd "node app.js" --auth-user admin --auth-password secret
+```
+
+**Using environment variables:**
+
+```bash
+PROCESS_PASTRY_AUTH_USER=admin PROCESS_PASTRY_AUTH_PASSWORD=secret bun run index.ts --cmd "node app.js"
+```
+
+**In custom UI JavaScript:**
+When making API calls from your custom UI, browsers will automatically handle Basic Auth if credentials are provided. For programmatic access, include credentials in the `Authorization` header:
+
+```javascript
+const response = await fetch("/process-pastry/api/config", {
+  headers: {
+    Authorization: "Basic " + btoa("admin:secret"),
+    "Content-Type": "application/json",
+  },
+});
+```
+
+**Notes:**
+
+- Authentication is optional - if no credentials are provided, the server works normally (backward compatible)
+- Both username and password must be provided if authentication is enabled
+- CLI arguments take precedence over environment variables
+- All routes are protected when auth is enabled (UI, static assets, and API endpoints)
+
 #### Request Proxying
 
 When using `--proxy-port`, your config UI and your application can share the same port. The proxy activates whenever `--proxy-port` is provided, regardless of whether you're using the default UI or a custom HTML UI. API routes (`/process-pastry/api/*`) and your HTML route are never proxied - only unmatched requests are forwarded to the target host and port.
@@ -675,6 +721,8 @@ startServer({
   exampleEnvPath: ".env.example", // optional
   proxyPort: 8080, // optional - proxy unmatched requests to this port
   proxyHost: "localhost", // optional - proxy host (default: "localhost")
+  authUser: "admin", // optional - username for HTTP Basic Auth
+  authPassword: "secret", // optional - password for HTTP Basic Auth
 });
 ```
 

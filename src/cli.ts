@@ -10,6 +10,8 @@ export interface CLIOptions {
   exampleEnv?: string;
   proxyPort?: string;
   proxyHost?: string;
+  authUser?: string;
+  authPassword?: string;
   help?: boolean;
 }
 
@@ -35,6 +37,10 @@ export function parseArgs(args: string[]): CLIOptions {
       options.proxyPort = args[++i];
     } else if (arg === "--proxy-host") {
       options.proxyHost = args[++i];
+    } else if (arg === "--auth-user") {
+      options.authUser = args[++i];
+    } else if (arg === "--auth-password") {
+      options.authPassword = args[++i];
     } else if (arg === "--help") {
       options.help = true;
     }
@@ -56,6 +62,8 @@ Options:
   --example-env, -E <path> Path to .env.example file (auto-discovered if not provided)
   --proxy-port <port>     Port to proxy unmatched requests to
   --proxy-host <host>     Host to proxy unmatched requests to (default: localhost)
+  --auth-user <user>      Username for HTTP Basic Auth (optional, can also use PROCESS_PASTRY_AUTH_USER env var)
+  --auth-password <pass>  Password for HTTP Basic Auth (optional, can also use PROCESS_PASTRY_AUTH_PASSWORD env var)
   --help                  Show this help message
 
 Examples:
@@ -114,6 +122,11 @@ export function runCLI(): void {
     }
   }
 
+  // Get auth credentials from CLI args or environment variables
+  const authUser = options.authUser || process.env.PROCESS_PASTRY_AUTH_USER;
+  const authPassword =
+    options.authPassword || process.env.PROCESS_PASTRY_AUTH_PASSWORD;
+
   // Start the server
   startServer({
     port,
@@ -124,5 +137,7 @@ export function runCLI(): void {
     exampleEnvPath: options.exampleEnv,
     proxyPort,
     proxyHost: options.proxyHost,
+    authUser,
+    authPassword,
   });
 }
