@@ -210,13 +210,35 @@ export function runCLI(): void {
     }
   }
 
-  // Read HTML file if provided
-  let htmlContent: string | undefined;
+  // Validate HTML file path if provided
+  let htmlPath: string | undefined;
   if (options.html) {
-    try {
-      htmlContent = readFileSync(options.html, "utf-8");
-    } catch (error) {
-      console.error(`Error reading HTML file: ${error}`);
+    const resolvedHtmlPath = resolve(options.html);
+    if (!existsSync(resolvedHtmlPath)) {
+      console.error(`Error: HTML file not found: ${resolvedHtmlPath}`);
+      process.exit(1);
+    }
+    htmlPath = resolvedHtmlPath;
+  }
+
+  // Validate that --html-route must be set (not '/') when using --proxy-port
+  // This prevents path conflicts between the HTML route/bundled assets and proxied requests
+  if (proxyPort) {
+    const htmlRoute = options.htmlRoute || "/";
+    if (htmlRoute === "/") {
+      console.error(
+        "Error: --html-route must be explicitly set (not '/') when using --proxy-port.",
+      );
+      console.error(
+        "This prevents path conflicts between the HTML route/bundled assets and proxied requests.",
+      );
+      if (htmlPath) {
+        console.error(
+          "Example: --html ./ui.html --html-route /config --proxy-port 8080",
+        );
+      } else {
+        console.error("Example: --html-route /config --proxy-port 8080");
+      }
       process.exit(1);
     }
   }
@@ -232,7 +254,7 @@ export function runCLI(): void {
     envPath: options.env || ".env",
     command,
     htmlRoute: options.htmlRoute || "/",
-    htmlContent,
+    htmlPath,
     exampleEnvPath: options.exampleEnv,
     proxyPort,
     proxyHost: options.proxyHost,

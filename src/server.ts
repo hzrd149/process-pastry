@@ -3,9 +3,7 @@ import { readFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { ProcessManager } from "./process-manager";
 import { readEnv, writeEnv, readEnvExample } from "./config-handler";
-
-// Get the directory of the current module (Bun supports import.meta.dir)
-const uiDir = join(import.meta.dir, "ui");
+import defaultUI from "./ui/index.html";
 
 const LOG_PREFIX = "[process-pastry]";
 const API_PREFIX = "/process-pastry/api";
@@ -131,7 +129,7 @@ export interface ServerOptions {
   envPath: string;
   command: string[];
   htmlRoute?: string; // Path for HTML route, default: "/"
-  htmlContent?: string | any; // HTML content to serve (from import or file path)
+  htmlPath?: string; // Path to HTML file to serve (will use Bun's bundler)
   exampleEnvPath?: string; // Path to .env.example file (auto-discovered if not provided)
   proxyPort?: number; // Port to proxy unmatched requests to (when custom HTML is provided)
   proxyHost?: string; // Host to proxy unmatched requests to (default: "localhost")
@@ -149,7 +147,7 @@ export async function startServer(options: ServerOptions): Promise<void> {
     envPath,
     command,
     htmlRoute = "/",
-    htmlContent,
+    htmlPath,
     exampleEnvPath,
     proxyPort,
     proxyHost = "localhost",
@@ -184,80 +182,13 @@ export async function startServer(options: ServerOptions): Promise<void> {
   const routes: Record<string, any> = {};
 
   // Add HTML route - use provided HTML or default UI
-  if (htmlContent) {
-    // Use provided HTML content
-    if (typeof htmlContent === "string") {
-      routes[htmlRoute] = () =>
-        new Response(htmlContent, {
-          headers: { "Content-Type": "text/html" },
-        });
-    } else {
-      routes[htmlRoute] = htmlContent;
-    }
+  if (htmlPath) {
+    console.log(`${LOG_PREFIX} 📄 Serving custom config html`);
+    const htmlFile = await import(htmlPath).then((module) => module.default);
+    routes[htmlRoute] = htmlFile;
   } else {
-    // Serve default UI from ui folder
-    const defaultUIHtml = readFileSync(join(uiDir, "index.html"), "utf-8");
-    routes[htmlRoute] = () =>
-      new Response(defaultUIHtml, {
-        headers: { "Content-Type": "text/html" },
-      });
-
-    // Serve UI static assets (CSS, JS)
-    routes["/ui/styles.css"] = () => {
-      const css = readFileSync(join(uiDir, "styles.css"), "utf-8");
-      return new Response(css, {
-        headers: { "Content-Type": "text/css" },
-      });
-    };
-
-    routes["/ui/app.js"] = () => {
-      const js = readFileSync(join(uiDir, "app.js"), "utf-8");
-      return new Response(js, {
-        headers: { "Content-Type": "application/javascript" },
-      });
-    };
-
-    routes["/ui/utils.js"] = () => {
-      const js = readFileSync(join(uiDir, "utils.js"), "utf-8");
-      return new Response(js, {
-        headers: { "Content-Type": "application/javascript" },
-      });
-    };
-
-    routes["/ui/state.js"] = () => {
-      const js = readFileSync(join(uiDir, "state.js"), "utf-8");
-      return new Response(js, {
-        headers: { "Content-Type": "application/javascript" },
-      });
-    };
-
-    routes["/ui/api.js"] = () => {
-      const js = readFileSync(join(uiDir, "api.js"), "utf-8");
-      return new Response(js, {
-        headers: { "Content-Type": "application/javascript" },
-      });
-    };
-
-    routes["/ui/ui.js"] = () => {
-      const js = readFileSync(join(uiDir, "ui.js"), "utf-8");
-      return new Response(js, {
-        headers: { "Content-Type": "application/javascript" },
-      });
-    };
-
-    routes["/ui/render.js"] = () => {
-      const js = readFileSync(join(uiDir, "render.js"), "utf-8");
-      return new Response(js, {
-        headers: { "Content-Type": "application/javascript" },
-      });
-    };
-
-    routes["/ui/change-detection.js"] = () => {
-      const js = readFileSync(join(uiDir, "change-detection.js"), "utf-8");
-      return new Response(js, {
-        headers: { "Content-Type": "application/javascript" },
-      });
-    };
+    // Use Bun's bundler for default UI - imports HTML and automatically bundles assets
+    routes[htmlRoute] = defaultUI;
   }
 
   // Helper function to check if restart should be skipped

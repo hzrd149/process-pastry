@@ -386,7 +386,7 @@ To use a custom UI, create an HTML file and pass it to process-pastry using the 
 bun run index.ts --cmd "node app.js" --html ./my-custom-ui.html --html-route /config
 ```
 
-process-pastry serves your custom HTML file and provides REST API endpoints for managing environment variables. Your HTML file can include inline `<script>` and `<link>` tags that Bun will automatically bundle.
+process-pastry serves your custom HTML file using Bun's bundler, which automatically processes and bundles any scripts and styles referenced in your HTML file. Your HTML file can include `<script>` and `<link>` tags (or import statements in script tags) that Bun will automatically bundle and serve.
 
 ### API Reference
 
@@ -996,14 +996,13 @@ For advanced use cases, you can also use process-pastry as a library:
 
 ```typescript
 import { startServer } from "process-pastry";
-import uiHtml from "./ui.html";
 
 startServer({
   port: 3000,
   envPath: ".env",
   command: ["node", "app.js"],
   htmlRoute: "/",
-  htmlContent: uiHtml,
+  htmlPath: "./ui.html", // Path to HTML file (Bun's bundler will process it)
   exampleEnvPath: ".env.example", // optional
   proxyPort: 8080, // optional - proxy unmatched requests to this port
   proxyHost: "localhost", // optional - proxy host (default: "localhost")
@@ -1012,7 +1011,7 @@ startServer({
 });
 ```
 
-**Note:** Most users should use the CLI interface. The programmatic API is available for integration into other applications or build tools.
+**Note:** Most users should use the CLI interface. The programmatic API is available for integration into other applications or build tools. When providing `htmlPath`, Bun's bundler will automatically process the HTML file and bundle any scripts/styles referenced in it.
 
 ## License
 
