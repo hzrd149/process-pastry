@@ -33,9 +33,7 @@ export class ProcessManager {
 
     // Kill existing process if running
     if (this.childProcess) {
-      this.kill();
-      // Wait a bit for process to fully terminate
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await this.kill();
     }
 
     try {
@@ -116,15 +114,72 @@ export class ProcessManager {
 
   /**
    * Kills the child process if it's running
+   * First attempts graceful shutdown (SIGTERM), then force kills (SIGKILL) if needed
+   * @param timeoutMs Time to wait for graceful shutdown before force killing (default: 5000ms)
    */
-  kill(): void {
-    if (this.childProcess) {
+  async kill(timeoutMs: number = 5000): Promise<void> {
+    if (!this.childProcess) {
+      return;
+    }
+
+    const pid = this.childProcess.pid;
+    if (!pid) {
+      this.childProcess = null;
+      return;
+    }
+
+    try {
+      // Send SIGTERM for graceful shutdown
       try {
-        this.childProcess.kill();
-        this.childProcess = null;
+        // Use process.kill directly with PID for signal support
+        process.kill(pid, "SIGTERM");
       } catch (error) {
-        console.error(`${LOG_PREFIX} Error killing process:`, error);
+        // Process might already be dead, continue to cleanup
       }
+
+      // Wait for process to exit gracefully
+      const startTime = Date.now();
+      while (Date.now() - startTime < timeoutMs) {
+        // Check if childProcess reference is still valid
+        if (!this.childProcess) {
+          return; // Process already cleaned up
+        }
+
+        // Check if process has exited
+        if (this.childProcess.exitCode !== null) {
+          this.childProcess = null;
+          return;
+        }
+
+        // Check if process is still alive by attempting to send signal 0 (no-op)
+        try {
+          process.kill(pid, 0);
+        } catch (error) {
+          // Process is dead (ESRCH error means process doesn't exist)
+          this.childProcess = null;
+          return;
+        }
+
+        // Wait a bit before checking again
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      // Process didn't exit gracefully, force kill with SIGKILL
+      console.log(
+        `${LOG_PREFIX} Process ${pid} didn't exit gracefully, force killing...`,
+      );
+      try {
+        process.kill(pid, "SIGKILL");
+      } catch (error) {
+        // Process might already be dead, ignore
+      }
+
+      // Wait a moment for force kill to take effect
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      this.childProcess = null;
+    } catch (error) {
+      console.error(`${LOG_PREFIX} Error killing process:`, error);
+      this.childProcess = null;
     }
   }
 

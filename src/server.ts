@@ -484,6 +484,52 @@ export async function startServer(options: ServerOptions): Promise<void> {
 
   const server = serve(serverConfig);
 
+  // Track if we're already shutting down to prevent multiple cleanup calls
+  let isShuttingDown = false;
+
+  // Setup cleanup handlers to kill child process on exit
+  const cleanup = async () => {
+    if (isShuttingDown) {
+      return;
+    }
+    isShuttingDown = true;
+
+    console.log(`${LOG_PREFIX} Shutting down...`);
+    try {
+      await processManager.kill();
+    } catch (error) {
+      console.error(`${LOG_PREFIX} Error during cleanup:`, error);
+    }
+    process.exit(0);
+  };
+
+  // Signal handlers - allow graceful shutdown
+  process.on("SIGINT", async () => {
+    await cleanup();
+  });
+  process.on("SIGTERM", async () => {
+    await cleanup();
+  });
+
+  // Exit handler - try to kill but can't await (exit handler can't be async)
+  process.on("exit", () => {
+    // Start kill but don't wait (exit handler must be synchronous)
+    processManager.kill().catch(() => {
+      // Ignore errors during exit
+    });
+  });
+
+  // Also cleanup on uncaught exceptions
+  process.on("uncaughtException", async (error) => {
+    console.error(`${LOG_PREFIX} Uncaught exception:`, error);
+    await cleanup();
+  });
+
+  process.on("unhandledRejection", async (reason) => {
+    console.error(`${LOG_PREFIX} Unhandled rejection:`, reason);
+    await cleanup();
+  });
+
   const protocol = ssl ? "https" : "http";
   console.log(
     `${LOG_PREFIX} 🚀 Config manager running on ${protocol}://localhost:${port}`,

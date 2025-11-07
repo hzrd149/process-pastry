@@ -29,6 +29,14 @@ export function readEnv(envPath: string): Record<string, string> {
       return;
     }
 
+    // Validate that there are no spaces around the = sign (invalid env syntax)
+    const charBefore = trimmed[equalIndex - 1];
+    const charAfter = trimmed[equalIndex + 1];
+    if (charBefore === " " || charAfter === " ") {
+      // Invalid syntax - skip this line
+      return;
+    }
+
     const key = trimmed.substring(0, equalIndex).trim();
     const value = trimmed.substring(equalIndex + 1).trim();
 
@@ -129,6 +137,18 @@ export function readEnvExample(
       // Check if this is a commented-out variable (has = or looks like a variable name)
       const equalIndex = afterHash.indexOf("=");
       if (equalIndex !== -1) {
+        // Validate that there are no spaces around the = sign (invalid env syntax)
+        const charBefore = afterHash[equalIndex - 1];
+        const charAfter = afterHash[equalIndex + 1];
+        if (charBefore === " " || charAfter === " ") {
+          // Invalid syntax - treat as regular comment
+          if (afterHash) {
+            currentComments.push(afterHash);
+          }
+          i++;
+          continue;
+        }
+
         // Commented variable with value: # VARIABLE=value
         const key = afterHash.substring(0, equalIndex).trim();
         const value = afterHash.substring(equalIndex + 1).trim();
@@ -162,6 +182,16 @@ export function readEnvExample(
     // Non-comment line - check if it's a variable assignment
     const equalIndex = trimmed.indexOf("=");
     if (equalIndex !== -1) {
+      // Validate that there are no spaces around the = sign (invalid env syntax)
+      const charBefore = trimmed[equalIndex - 1];
+      const charAfter = trimmed[equalIndex + 1];
+      if (charBefore === " " || charAfter === " ") {
+        // Invalid syntax - skip this line
+        currentComments = [];
+        i++;
+        continue;
+      }
+
       // Variable with value: VARIABLE=value
       const key = trimmed.substring(0, equalIndex).trim();
       const value = trimmed.substring(equalIndex + 1).trim();
