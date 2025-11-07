@@ -1,5 +1,5 @@
 import { readFileSync, writeFileSync, existsSync } from "fs";
-import { resolve } from "path";
+import { resolve, dirname, join } from "path";
 
 /**
  * Reads environment variables from a .env file
@@ -67,4 +67,119 @@ export function writeEnv(
     .join("\n");
 
   writeFileSync(resolvedPath, content, "utf-8");
+}
+
+export interface EnvVariableSchema {
+  description: string;
+  defaultValue?: string;
+  commented: boolean;
+}
+
+/**
+ * Reads and parses a .env.example file to extract variable metadata
+ * @param exampleEnvPath Path to the .env.example file
+ * @returns Record of variable names to their schema metadata
+ */
+export function readEnvExample(
+  exampleEnvPath?: string,
+  envPath?: string,
+): Record<string, EnvVariableSchema> {
+  // Auto-discover .env.example if not provided
+  let resolvedExamplePath: string;
+  if (exampleEnvPath) {
+    resolvedExamplePath = resolve(exampleEnvPath);
+  } else if (envPath) {
+    // Auto-discover in same directory as .env
+    const envDir = dirname(resolve(envPath));
+    resolvedExamplePath = join(envDir, ".env.example");
+  } else {
+    return {};
+  }
+
+  if (!existsSync(resolvedExamplePath)) {
+    return {};
+  }
+
+  const content = readFileSync(resolvedExamplePath, "utf-8");
+  const schema: Record<string, EnvVariableSchema> = {};
+  const lines = content.split("\n");
+
+  let currentComments: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i];
+    if (!line) {
+      i++;
+      continue;
+    }
+    const trimmed = line.trim();
+
+    // Empty line - reset comments if we hit an empty line
+    if (!trimmed) {
+      currentComments = [];
+      i++;
+      continue;
+    }
+
+    // Check if this is a comment line or commented-out variable
+    if (trimmed.startsWith("#")) {
+      const afterHash = trimmed.substring(1).trim();
+
+      // Check if this is a commented-out variable (has = or looks like a variable name)
+      const equalIndex = afterHash.indexOf("=");
+      if (equalIndex !== -1) {
+        // Commented variable with value: # VARIABLE=value
+        const key = afterHash.substring(0, equalIndex).trim();
+        const value = afterHash.substring(equalIndex + 1).trim();
+        const unquotedValue = value.replace(/^["']|["']$/g, "");
+
+        if (key) {
+          schema[key] = {
+            description: currentComments.join("\n"),
+            defaultValue: unquotedValue || undefined,
+            commented: true,
+          };
+        }
+        currentComments = [];
+      } else if (/^[A-Z_][A-Z0-9_]*$/.test(afterHash)) {
+        // Commented variable without value: # VARIABLE
+        schema[afterHash] = {
+          description: currentComments.join("\n"),
+          commented: true,
+        };
+        currentComments = [];
+      } else {
+        // Regular comment line - collect for next variable
+        if (afterHash) {
+          currentComments.push(afterHash);
+        }
+      }
+      i++;
+      continue;
+    }
+
+    // Non-comment line - check if it's a variable assignment
+    const equalIndex = trimmed.indexOf("=");
+    if (equalIndex !== -1) {
+      // Variable with value: VARIABLE=value
+      const key = trimmed.substring(0, equalIndex).trim();
+      const value = trimmed.substring(equalIndex + 1).trim();
+      const unquotedValue = value.replace(/^["']|["']$/g, "");
+
+      if (key) {
+        schema[key] = {
+          description: currentComments.join("\n"),
+          defaultValue: unquotedValue || undefined,
+          commented: false,
+        };
+      }
+    }
+
+    // Reset comments after processing a variable
+    currentComments = [];
+    i++;
+  }
+
+  return schema;
 }

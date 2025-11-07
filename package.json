@@ -7,7 +7,7 @@
   "main": "index.ts",
   "scripts": {
     "format": "prettier -w .",
-    "dev": "bun run index.ts --cmd \"bun run example/index.ts\" --env .env.example --port 3000"
+    "dev": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --port 3000"
   },
   "bin": {
     "process-pastry": "./index.ts"
@@ -25,9 +25,9 @@
     "env",
     "ui"
   ],
-  "author": "",
+  "repository": "git@github.com:hzrd149/process-pastry.git",
+  "author": "hzrd149",
   "license": "MIT",
-  "private": true,
   "devDependencies": {
     "@types/bun": "latest",
     "prettier": "^3.6.2"

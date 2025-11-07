@@ -1,0 +1,88 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Process Config Manager</title>
+    <link rel="stylesheet" href="/ui/styles.css" />
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>⚙️ Process Config Manager</h1>
+        <div class="status">
+          <div class="status-indicator" id="statusIndicator"></div>
+          <span id="statusText">Checking status...</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Environment Variables</h2>
+
+        <div id="envVarsContainer" class="env-vars">
+          <!-- Environment variables will be dynamically added here -->
+        </div>
+
+        <div id="exampleSection" class="example-section" style="display: none">
+          <div class="example-header" id="exampleHeader">
+            <h3>
+              <span>📋</span>
+              <span>Example Variables</span>
+              <span class="example-toggle">▼</span>
+            </h3>
+            <span style="color: #6b7280" id="exampleCount"></span>
+          </div>
+          <div id="exampleVarsContainer" class="example-vars">
+            <!-- Example variables will be dynamically added here -->
+          </div>
+        </div>
+
+        <div class="add-var">
+          <div style="flex: 1; display: flex; flex-direction: column">
+            <input
+              type="text"
+              id="newVarKey"
+              list="varPresets"
+              placeholder="Variable name (e.g., PORT)"
+              autocomplete="off"
+            />
+            <datalist id="varPresets"></datalist>
+            <div
+              class="var-preset-hint"
+              id="presetHint"
+              style="display: none"
+            ></div>
+          </div>
+          <input
+            type="text"
+            id="newVarValue"
+            placeholder="Value (e.g., 3000)"
+          />
+          <button type="button" id="addVarBtn">Add Variable</button>
+        </div>
+
+        <div class="button-group">
+          <button class="primary" id="saveBtn" type="button">
+            💾 Save & Restart
+          </button>
+          <span
+            id="modifiedIndicator"
+            class="modified-indicator"
+            style="display: none"
+          >
+            ⚠️ Unsaved changes
+          </span>
+        </div>
+      </div>
+
+      <div class="card" id="errorCard" style="display: none">
+        <h2 style="margin-bottom: 12px; color: #991b1b">❌ Process Error</h2>
+        <div class="error-log" id="errorLog"></div>
+      </div>
+    </div>
+
+    <div id="alert" class="alert"></div>
+
+    <script type="module" src="/ui/app.js"></script>
+  </body>
+</html>

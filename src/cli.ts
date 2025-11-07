@@ -7,6 +7,8 @@ export interface CLIOptions {
   port?: string;
   html?: string;
   htmlRoute?: string;
+  exampleEnv?: string;
+  proxyPort?: string;
   help?: boolean;
 }
 
@@ -26,6 +28,10 @@ export function parseArgs(args: string[]): CLIOptions {
       options.html = args[++i];
     } else if (arg === "--html-route") {
       options.htmlRoute = args[++i];
+    } else if (arg === "--example-env" || arg === "-E") {
+      options.exampleEnv = args[++i];
+    } else if (arg === "--proxy-port") {
+      options.proxyPort = args[++i];
     } else if (arg === "--help") {
       options.help = true;
     }
@@ -44,12 +50,15 @@ Options:
   --port, -p <port>       Web server port (default: 3000)
   --html, -h <path>       Path to HTML file to serve as UI (optional)
   --html-route <path>     Route path for HTML UI (default: /)
+  --example-env, -E <path> Path to .env.example file (auto-discovered if not provided)
+  --proxy-port <port>     Port to proxy unmatched requests to (only when custom HTML is provided)
   --help                  Show this help message
 
 Examples:
   process-pastry --cmd "node app.js" --env .env
   process-pastry --cmd "bun run server.ts" --env config/.env --port 8080
   process-pastry --cmd "node app.js" --html ./ui.html --html-route /config
+  process-pastry --cmd "node app.js" --html ./ui.html --html-route /config --proxy-port 4000
 `);
 }
 
@@ -79,6 +88,16 @@ export function runCLI(): void {
     process.exit(1);
   }
 
+  // Parse proxy port
+  let proxyPort: number | undefined;
+  if (options.proxyPort) {
+    proxyPort = parseInt(options.proxyPort, 10);
+    if (isNaN(proxyPort) || proxyPort < 1 || proxyPort > 65535) {
+      console.error("Error: Invalid proxy port number");
+      process.exit(1);
+    }
+  }
+
   // Read HTML file if provided
   let htmlContent: string | undefined;
   if (options.html) {
@@ -97,5 +116,7 @@ export function runCLI(): void {
     command,
     htmlRoute: options.htmlRoute || "/",
     htmlContent,
+    exampleEnvPath: options.exampleEnv,
+    proxyPort,
   });
 }

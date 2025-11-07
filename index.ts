@@ -7,7 +7,12 @@ export {
   type ProcessManagerOptions,
   type ProcessStatus,
 } from "./src/process-manager";
-export { readEnv, writeEnv } from "./src/config-handler";
+export {
+  readEnv,
+  writeEnv,
+  readEnvExample,
+  type EnvVariableSchema,
+} from "./src/config-handler";
 export { parseArgs, printHelp, runCLI, type CLIOptions } from "./src/cli";
 
 // CLI entry point when run directly

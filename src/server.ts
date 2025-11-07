@@ -1,7 +1,11 @@
 import { serve } from "bun";
+import { readFileSync } from "fs";
+import { join } from "path";
 import { ProcessManager } from "./process-manager";
-import { readEnv, writeEnv } from "./config-handler";
-import defaultUI from "./default-ui.html";
+import { readEnv, writeEnv, readEnvExample } from "./config-handler";
+
+// Get the directory of the current module (Bun supports import.meta.dir)
+const uiDir = join(import.meta.dir, "ui");
 
 const LOG_PREFIX = "[process-pastry]";
 
@@ -11,10 +15,20 @@ export interface ServerOptions {
   command: string[];
   htmlRoute?: string; // Path for HTML route, default: "/"
   htmlContent?: string | any; // HTML content to serve (from import or file path)
+  exampleEnvPath?: string; // Path to .env.example file (auto-discovered if not provided)
+  proxyPort?: number; // Port to proxy unmatched requests to (when custom HTML is provided)
 }
 
 export function startServer(options: ServerOptions): void {
-  const { port, envPath, command, htmlRoute = "/", htmlContent } = options;
+  const {
+    port,
+    envPath,
+    command,
+    htmlRoute = "/",
+    htmlContent,
+    exampleEnvPath,
+    proxyPort,
+  } = options;
 
   // Initialize process manager
   const processManager = new ProcessManager({ command, envPath });
@@ -28,18 +42,80 @@ export function startServer(options: ServerOptions): void {
   const routes: Record<string, any> = {};
 
   // Add HTML route - use provided HTML or default UI
-  const uiToServe = htmlContent || defaultUI;
-  if (uiToServe) {
-    if (typeof uiToServe === "string") {
-      // For string content (from file read), serve as HTML response
+  if (htmlContent) {
+    // Use provided HTML content
+    if (typeof htmlContent === "string") {
       routes[htmlRoute] = () =>
-        new Response(uiToServe, {
+        new Response(htmlContent, {
           headers: { "Content-Type": "text/html" },
         });
     } else {
-      // For HTML imports, pass directly to Bun's routes
-      routes[htmlRoute] = uiToServe;
+      routes[htmlRoute] = htmlContent;
     }
+  } else {
+    // Serve default UI from ui folder
+    const defaultUIHtml = readFileSync(join(uiDir, "index.html"), "utf-8");
+    routes[htmlRoute] = () =>
+      new Response(defaultUIHtml, {
+        headers: { "Content-Type": "text/html" },
+      });
+
+    // Serve UI static assets (CSS, JS)
+    routes["/ui/styles.css"] = () => {
+      const css = readFileSync(join(uiDir, "styles.css"), "utf-8");
+      return new Response(css, {
+        headers: { "Content-Type": "text/css" },
+      });
+    };
+
+    routes["/ui/app.js"] = () => {
+      const js = readFileSync(join(uiDir, "app.js"), "utf-8");
+      return new Response(js, {
+        headers: { "Content-Type": "application/javascript" },
+      });
+    };
+
+    routes["/ui/utils.js"] = () => {
+      const js = readFileSync(join(uiDir, "utils.js"), "utf-8");
+      return new Response(js, {
+        headers: { "Content-Type": "application/javascript" },
+      });
+    };
+
+    routes["/ui/state.js"] = () => {
+      const js = readFileSync(join(uiDir, "state.js"), "utf-8");
+      return new Response(js, {
+        headers: { "Content-Type": "application/javascript" },
+      });
+    };
+
+    routes["/ui/api.js"] = () => {
+      const js = readFileSync(join(uiDir, "api.js"), "utf-8");
+      return new Response(js, {
+        headers: { "Content-Type": "application/javascript" },
+      });
+    };
+
+    routes["/ui/ui.js"] = () => {
+      const js = readFileSync(join(uiDir, "ui.js"), "utf-8");
+      return new Response(js, {
+        headers: { "Content-Type": "application/javascript" },
+      });
+    };
+
+    routes["/ui/render.js"] = () => {
+      const js = readFileSync(join(uiDir, "render.js"), "utf-8");
+      return new Response(js, {
+        headers: { "Content-Type": "application/javascript" },
+      });
+    };
+
+    routes["/ui/change-detection.js"] = () => {
+      const js = readFileSync(join(uiDir, "change-detection.js"), "utf-8");
+      return new Response(js, {
+        headers: { "Content-Type": "application/javascript" },
+      });
+    };
   }
 
   // Helper function to check if restart should be skipped
@@ -133,18 +209,78 @@ export function startServer(options: ServerOptions): void {
     },
   };
 
+  routes["/api/example"] = {
+    GET() {
+      try {
+        const schema = readEnvExample(exampleEnvPath, envPath);
+        return Response.json(schema);
+      } catch (error) {
+        // Return empty object if there's an error (e.g., file doesn't exist)
+        return Response.json({});
+      }
+    },
+  };
+
+  // Helper function to proxy requests to another port
+  async function proxyRequest(req: Request, targetPort: number): Promise<Response> {
+    const url = new URL(req.url);
+    const targetUrl = `http://localhost:${targetPort}${url.pathname}${url.search}`;
+
+    try {
+      const proxyReq = new Request(targetUrl, {
+        method: req.method,
+        headers: req.headers,
+        body: req.method !== "GET" && req.method !== "HEAD" ? req.body : undefined,
+      });
+
+      const response = await fetch(proxyReq);
+      return response;
+    } catch (error) {
+      console.error(`${LOG_PREFIX} Proxy error:`, error);
+      return new Response("Proxy Error", { status: 502 });
+    }
+  }
+
   // Start the server
   const server = serve({
     port,
     routes,
     fetch(req) {
+      // If proxyPort is provided and custom HTML is used, proxy unmatched routes
+      if (proxyPort && htmlContent) {
+        const url = new URL(req.url);
+        const pathname = url.pathname;
+
+        // Don't proxy API routes or the HTML route
+        if (
+          pathname.startsWith("/api/") ||
+          pathname === htmlRoute ||
+          pathname.startsWith(htmlRoute + "/")
+        ) {
+          // Let the routes handle it or return 404
+          return new Response("Not Found", { status: 404 });
+        }
+
+        // Proxy all other requests to the target port
+        return proxyRequest(req, proxyPort);
+      }
+
       // Handle any unmatched routes
       return new Response("Not Found", { status: 404 });
     },
   });
 
-  console.log(`${LOG_PREFIX} 🚀 Config manager running on http://localhost:${port}`);
+  console.log(
+    `${LOG_PREFIX} 🚀 Config manager running on http://localhost:${port}`,
+  );
   console.log(`${LOG_PREFIX} 📝 Config file: ${envPath}`);
   console.log(`${LOG_PREFIX} 🔄 Managing process: ${command.join(" ")}`);
-  console.log(`${LOG_PREFIX} 🌐 UI available at http://localhost:${port}${htmlRoute}`);
+  console.log(
+    `${LOG_PREFIX} 🌐 UI available at http://localhost:${port}${htmlRoute}`,
+  );
+  if (proxyPort && htmlContent) {
+    console.log(
+      `${LOG_PREFIX} 🔀 Proxying unmatched requests to http://localhost:${proxyPort}`,
+    );
+  }
 }
