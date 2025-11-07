@@ -74,9 +74,8 @@ export async function init() {
     // If it was hidden, remove from hidden set
     state.hiddenVars.delete(key);
 
-    // Use default value from schema if no value provided
-    const defaultValue = state.envSchema[key]?.defaultValue || value;
-    const finalValue = defaultValue || value;
+    // Use user's value if provided, otherwise use default value from schema
+    const finalValue = value || state.envSchema[key]?.defaultValue || "";
     state.envVars[key] = finalValue;
     // Don't set originalEnvVars for new variables - this marks them as modified
 
