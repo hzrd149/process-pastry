@@ -1,5 +1,6 @@
 import { startServer } from "./server";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync } from "fs";
+import { resolve } from "path";
 
 export interface CLIOptions {
   env?: string;
@@ -17,6 +18,47 @@ export interface CLIOptions {
   sslKey?: string;
   sslHost?: string;
   help?: boolean;
+  config?: string;
+}
+
+/**
+ * Loads configuration from a JSON file
+ * @param configPath Path to the config file
+ * @returns CLIOptions object or null if file doesn't exist
+ */
+function loadConfigFile(configPath: string): CLIOptions | null {
+  const resolvedPath = resolve(configPath);
+
+  if (!existsSync(resolvedPath)) {
+    return null;
+  }
+
+  try {
+    const content = readFileSync(resolvedPath, "utf-8");
+    const config = JSON.parse(content) as CLIOptions;
+
+    // Validate that config has expected structure (basic validation)
+    // Convert port and proxyPort to strings if they're numbers (for consistency)
+    if (config.port && typeof config.port === "number") {
+      config.port = String(config.port);
+    }
+    if (config.proxyPort && typeof config.proxyPort === "number") {
+      config.proxyPort = String(config.proxyPort);
+    }
+
+    return config;
+  } catch (error) {
+    if (error instanceof SyntaxError) {
+      console.error(
+        `Error: Invalid JSON in config file ${resolvedPath}: ${error.message}`,
+      );
+    } else {
+      console.error(
+        `Error: Failed to read config file ${resolvedPath}: ${error}`,
+      );
+    }
+    process.exit(1);
+  }
 }
 
 export function parseArgs(args: string[]): CLIOptions {
@@ -53,6 +95,8 @@ export function parseArgs(args: string[]): CLIOptions {
       options.sslKey = args[++i];
     } else if (arg === "--ssl-host") {
       options.sslHost = args[++i];
+    } else if (arg === "--config") {
+      options.config = args[++i];
     } else if (arg === "--help") {
       options.help = true;
     }
@@ -66,6 +110,7 @@ export function printHelp(): void {
 Usage: process-pastry [options]
 
 Options:
+  --config <path>         Path to JSON config file (default: process-pastry.json in current directory)
   --env, -e <path>        Path to .env file (default: .env)
   --cmd, -c <command>     Command to run as child process (required)
   --port, -p <port>       Web server port (default: 3000)
@@ -82,6 +127,22 @@ Options:
   --ssl-host <hostname>   Hostname for certificate (default: localhost)
   --help                  Show this help message
 
+Config File:
+  You can create a process-pastry.json file in your project directory to avoid specifying
+  all options via CLI arguments. CLI arguments will override values from the config file.
+
+  Example config file (process-pastry.json):
+  {
+    "cmd": "node app.js",
+    "env": ".env",
+    "port": "3000",
+    "html": "./ui.html",
+    "htmlRoute": "/",
+    "proxyPort": "4000",
+    "proxyHost": "localhost",
+    "ssl": true
+  }
+
 Examples:
   process-pastry --cmd "node app.js" --env .env
   process-pastry --cmd "bun run server.ts" --env config/.env --port 8080
@@ -90,12 +151,32 @@ Examples:
   process-pastry --cmd "node app.js" --html ./ui.html --html-route /config --proxy-port 4000 --proxy-host 192.168.1.100
   process-pastry --cmd "node app.js" --env .env --ssl
   process-pastry --cmd "node app.js" --env .env --ssl --ssl-cert ./cert.pem --ssl-key ./key.pem
+  process-pastry --config ./my-config.json
 `);
 }
 
 export function runCLI(): void {
   const args = process.argv.slice(2);
-  const options = parseArgs(args);
+  const cliOptions = parseArgs(args);
+
+  // Load config file if specified or try to auto-discover
+  let configOptions: CLIOptions = {};
+  const configPath = cliOptions.config || "process-pastry.json";
+  const loadedConfig = loadConfigFile(configPath);
+  if (loadedConfig) {
+    configOptions = loadedConfig;
+  } else if (cliOptions.config) {
+    // User explicitly specified a config file that doesn't exist
+    console.warn(
+      `Warning: Config file specified with --config not found: ${configPath}`,
+    );
+  }
+
+  // Merge config file options with CLI options (CLI overrides config)
+  const options: CLIOptions = {
+    ...configOptions,
+    ...cliOptions,
+  };
 
   if (options.help) {
     printHelp();

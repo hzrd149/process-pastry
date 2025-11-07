@@ -21,6 +21,122 @@ A CLI tool built with Bun that provides a web-based configuration interface for 
 bun install
 ```
 
+## Docker Installation
+
+process-pastry can be installed in Docker images in two ways:
+
+### Option 1: Install via Bun Package Manager
+
+Install process-pastry directly from GitHub using Bun's package manager:
+
+```dockerfile
+FROM oven/bun:latest
+
+# Install process-pastry from GitHub
+RUN bun install https://github.com/hzrd149/process-pastry
+
+# Your app code
+WORKDIR /app
+COPY . .
+
+# Run process-pastry with your app
+CMD ["bun", "run", "/node_modules/process-pastry/index.ts", "--cmd", "bun run app.ts", "--env", ".env"]
+```
+
+### Option 2: Download Binary from GitHub Releases
+
+Download a pre-built binary from [GitHub Releases](https://github.com/hzrd149/process-pastry/releases). Binaries are available for:
+
+- `linux-x64` (Linux 64-bit)
+- `linux-arm64` (Linux ARM64)
+- `darwin-x64` (macOS Intel)
+- `darwin-arm64` (macOS Apple Silicon)
+- `windows-x64` (Windows 64-bit)
+
+**Example Dockerfile for a Bun app:**
+
+```dockerfile
+FROM oven/bun:latest
+
+WORKDIR /app
+
+# Download and extract process-pastry binary
+ARG PROCESS_PASTRY_VERSION=v0.1.0
+ARG PROCESS_PASTRY_PLATFORM=linux-x64
+ADD "https://github.com/hzrd149/process-pastry/releases/download/${PROCESS_PASTRY_VERSION}/process-pastry-${PROCESS_PASTRY_PLATFORM}.tar.gz" /tmp/
+RUN tar -xzf /tmp/process-pastry-${PROCESS_PASTRY_PLATFORM}.tar.gz -C . && \
+    chmod +x process-pastry-${PROCESS_PASTRY_PLATFORM} && \
+    mv process-pastry-${PROCESS_PASTRY_PLATFORM} process-pastry && \
+    rm /tmp/process-pastry-${PROCESS_PASTRY_PLATFORM}.tar.gz
+
+# Copy your app
+COPY . .
+
+# Run process-pastry with your Bun app
+CMD ["./process-pastry", "--cmd", "bun run app.ts", "--env", ".env", "--port", "3000"]
+```
+
+**Example Dockerfile for a Node.js app:**
+
+```dockerfile
+FROM node:20-slim
+
+WORKDIR /app
+
+# Download and extract process-pastry binary
+ARG PROCESS_PASTRY_VERSION=v0.1.0
+ARG PROCESS_PASTRY_PLATFORM=linux-x64
+ADD "https://github.com/hzrd149/process-pastry/releases/download/${PROCESS_PASTRY_VERSION}/process-pastry-${PROCESS_PASTRY_PLATFORM}.tar.gz" /tmp/
+RUN tar -xzf /tmp/process-pastry-${PROCESS_PASTRY_PLATFORM}.tar.gz -C . && \
+    chmod +x process-pastry-${PROCESS_PASTRY_PLATFORM} && \
+    mv process-pastry-${PROCESS_PASTRY_PLATFORM} process-pastry && \
+    rm /tmp/process-pastry-${PROCESS_PASTRY_PLATFORM}.tar.gz
+
+# Copy your app
+COPY . .
+
+# Install your app dependencies
+RUN npm install
+
+# Run process-pastry with your Node.js app
+CMD ["./process-pastry", "--cmd", "node app.js", "--env", ".env", "--port", "3000"]
+```
+
+**Example Dockerfile for any other app (Python, Go, etc.):**
+
+```dockerfile
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Download and extract process-pastry binary
+ARG PROCESS_PASTRY_VERSION=v0.1.0
+ARG PROCESS_PASTRY_PLATFORM=linux-x64
+ADD "https://github.com/hzrd149/process-pastry/releases/download/${PROCESS_PASTRY_VERSION}/process-pastry-${PROCESS_PASTRY_PLATFORM}.tar.gz" /tmp/
+RUN tar -xzf /tmp/process-pastry-${PROCESS_PASTRY_PLATFORM}.tar.gz -C . && \
+    chmod +x process-pastry-${PROCESS_PASTRY_PLATFORM} && \
+    mv process-pastry-${PROCESS_PASTRY_PLATFORM} process-pastry && \
+    rm /tmp/process-pastry-${PROCESS_PASTRY_PLATFORM}.tar.gz
+
+# Copy your app
+COPY . .
+
+# Install your app dependencies
+RUN pip install -r requirements.txt
+
+# Run process-pastry with your app
+CMD ["./process-pastry", "--cmd", "python app.py", "--env", ".env", "--port", "3000"]
+```
+
+**Notes:**
+
+- Replace `v0.1.0` with the latest version tag from [GitHub Releases](https://github.com/hzrd149/process-pastry/releases)
+- For ARM64 architectures (e.g., AWS Graviton, Apple Silicon), use `linux-arm64` or `darwin-arm64`
+- The binary method is more efficient for production as it doesn't require Bun to be installed (except for the package method)
+- When using the binary, ensure the platform matches your Docker image architecture
+- You can set `PROCESS_PASTRY_VERSION` and `PROCESS_PASTRY_PLATFORM` as build arguments to make your Dockerfile more flexible
+- The binary is extracted directly into the app directory (`/app`) and run with `./process-pastry` - no PATH configuration needed
+
 ## Usage
 
 process-pastry is primarily used as a CLI tool. Run it with your command and configuration options:
@@ -58,12 +174,65 @@ bun run index.ts --cmd "node app.js" --env .env --ssl
 
 # With SSL/HTTPS using custom certificate
 bun run index.ts --cmd "node app.js" --env .env --ssl --ssl-cert ./cert.pem --ssl-key ./key.pem
+
+# Using config file (process-pastry.json) - all options from config
+bun run index.ts
+
+# Using config file but overriding specific options
+bun run index.ts --port 8080  # Overrides port from config file
 ```
 
 **Note:** If no `--html` option is provided, a default UI will be automatically served at the root route.
 
+### Configuration File
+
+Instead of specifying all options via CLI arguments, you can create a `process-pastry.json` file in your project directory. The config file supports all the same options as CLI arguments.
+
+**Example `process-pastry.json`:**
+
+```json
+{
+  "cmd": "node app.js",
+  "env": ".env",
+  "port": "3000",
+  "html": "./ui.html",
+  "htmlRoute": "/",
+  "exampleEnv": ".env.example",
+  "proxyPort": "4000",
+  "proxyHost": "localhost",
+  "authUser": "admin",
+  "authPassword": "password",
+  "ssl": true,
+  "sslCert": "./cert.pem",
+  "sslKey": "./key.pem",
+  "sslHost": "localhost"
+}
+```
+
+**Usage:**
+
+```bash
+# Auto-discover process-pastry.json in current directory
+bun run index.ts
+
+# Specify a custom config file path
+bun run index.ts --config ./my-config.json
+
+# Use config file but override specific options via CLI
+bun run index.ts --port 8080  # Overrides port from config file
+```
+
+**Precedence:** CLI arguments always override values from the config file. This allows you to:
+
+- Set defaults in the config file
+- Override specific values when needed via CLI arguments
+- Use config file for most options, CLI for quick adjustments
+
+**Note:** The config file is optional. If it doesn't exist, process-pastry works exactly as before using only CLI arguments.
+
 ### CLI Options
 
+- `--config <path>` - Path to JSON config file (default: `process-pastry.json` in current directory)
 - `--env, -e <path>` - Path to `.env` file (default: `.env`)
 - `--cmd, -c <command>` - Command to run as child process (required)
 - `--port, -p <port>` - Web server port (default: 3000)

@@ -1,0 +1,5 @@
+{
+  "cmd": "bun run example/index.ts",
+  "env": "example/.env",
+  "port": "3000"
+}
