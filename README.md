@@ -1002,7 +1002,9 @@ startServer({
   envPath: ".env",
   command: ["node", "app.js"],
   htmlRoute: "/",
-  htmlPath: "./ui.html", // Path to HTML file (Bun's bundler will process it)
+  html: "./ui.html", // Path to HTML file (Bun's bundler will process it)
+  // OR pass a pre-bundled Bun.HTMLBundle directly:
+  // html: myHTMLBundle, // Bun.HTMLBundle object
   exampleEnvPath: ".env.example", // optional
   proxyPort: 8080, // optional - proxy unmatched requests to this port
   proxyHost: "localhost", // optional - proxy host (default: "localhost")
@@ -1011,7 +1013,10 @@ startServer({
 });
 ```
 
-**Note:** Most users should use the CLI interface. The programmatic API is available for integration into other applications or build tools. When providing `htmlPath`, Bun's bundler will automatically process the HTML file and bundle any scripts/styles referenced in it.
+**Note:** Most users should use the CLI interface. The programmatic API is available for integration into other applications or build tools. The `html` field accepts either:
+
+- A string path to an HTML file (Bun's bundler will automatically process it and bundle any scripts/styles referenced in it)
+- A `Bun.HTMLBundle` object directly (useful when you've already bundled the HTML yourself)
 
 ## License
 

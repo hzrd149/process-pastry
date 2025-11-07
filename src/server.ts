@@ -129,7 +129,7 @@ export interface ServerOptions {
   envPath: string;
   command: string[];
   htmlRoute?: string; // Path for HTML route, default: "/"
-  htmlPath?: string; // Path to HTML file to serve (will use Bun's bundler)
+  html?: string | Bun.HTMLBundle; // Path to HTML file to serve (will use Bun's bundler)
   exampleEnvPath?: string; // Path to .env.example file (auto-discovered if not provided)
   proxyPort?: number; // Port to proxy unmatched requests to (when custom HTML is provided)
   proxyHost?: string; // Host to proxy unmatched requests to (default: "localhost")
@@ -147,7 +147,7 @@ export async function startServer(options: ServerOptions): Promise<void> {
     envPath,
     command,
     htmlRoute = "/",
-    htmlPath,
+    html,
     exampleEnvPath,
     proxyPort,
     proxyHost = "localhost",
@@ -182,10 +182,13 @@ export async function startServer(options: ServerOptions): Promise<void> {
   const routes: Record<string, any> = {};
 
   // Add HTML route - use provided HTML or default UI
-  if (htmlPath) {
+  if (typeof html === "string") {
     console.log(`${LOG_PREFIX} 📄 Serving custom config html`);
-    const htmlFile = await import(htmlPath).then((module) => module.default);
+    const htmlFile = await import(html).then((module) => module.default);
     routes[htmlRoute] = htmlFile;
+  } else if (html) {
+    console.log(`${LOG_PREFIX} 📄 Serving custom config html bundle`);
+    routes[htmlRoute] = html;
   } else {
     // Use Bun's bundler for default UI - imports HTML and automatically bundles assets
     routes[htmlRoute] = defaultUI;

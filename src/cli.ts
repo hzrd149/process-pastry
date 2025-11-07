@@ -254,7 +254,7 @@ export function runCLI(): void {
     envPath: options.env || ".env",
     command,
     htmlRoute: options.htmlRoute || "/",
-    htmlPath,
+    html: htmlPath,
     exampleEnvPath: options.exampleEnv,
     proxyPort,
     proxyHost: options.proxyHost,
