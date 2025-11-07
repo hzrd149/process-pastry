@@ -1,5 +1,5 @@
 import { serve } from "bun";
-import { readFileSync } from "fs";
+import { readFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { ProcessManager } from "./process-manager";
 import { readEnv, writeEnv, readEnvExample } from "./config-handler";
@@ -9,6 +9,122 @@ const uiDir = join(import.meta.dir, "ui");
 
 const LOG_PREFIX = "[process-pastry]";
 const API_PREFIX = "/process-pastry/api";
+
+/**
+ * Generate a self-signed SSL certificate using OpenSSL
+ * @param certPath Path to save the certificate
+ * @param keyPath Path to save the private key
+ * @param hostname Hostname for the certificate
+ * @returns Promise that resolves when certificate is generated
+ */
+async function generateSelfSignedCert(
+  certPath: string,
+  keyPath: string,
+  hostname: string,
+): Promise<void> {
+  const { spawn } = await import("child_process");
+
+  return new Promise((resolve, reject) => {
+    // Generate certificate using OpenSSL
+    const openssl = spawn("openssl", [
+      "req",
+      "-x509",
+      "-newkey",
+      "rsa:2048",
+      "-keyout",
+      keyPath,
+      "-out",
+      certPath,
+      "-days",
+      "365",
+      "-nodes",
+      "-subj",
+      `/CN=${hostname}/O=process-pastry/C=US`,
+    ]);
+
+    let stderr = "";
+
+    openssl.stderr.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    openssl.on("close", (code) => {
+      if (code === 0) {
+        resolve();
+      } else {
+        reject(new Error(`OpenSSL failed with code ${code}: ${stderr}`));
+      }
+    });
+
+    openssl.on("error", (error) => {
+      reject(
+        new Error(
+          `Failed to run OpenSSL: ${error.message}. Make sure OpenSSL is installed.`,
+        ),
+      );
+    });
+  });
+}
+
+/**
+ * Get or generate SSL certificate and key
+ * @param sslCert Optional path to certificate file
+ * @param sslKey Optional path to key file
+ * @param sslHost Hostname for certificate generation
+ * @returns Object with cert and key as strings
+ */
+async function getSSLCertificates(
+  sslCert?: string,
+  sslKey?: string,
+  sslHost: string = "localhost",
+): Promise<{ cert: string; key: string }> {
+  // If both cert and key are provided, read them
+  if (sslCert && sslKey) {
+    try {
+      const cert = readFileSync(sslCert, "utf-8");
+      const key = readFileSync(sslKey, "utf-8");
+      return { cert, key };
+    } catch (error) {
+      throw new Error(`Failed to read SSL certificate files: ${error}`);
+    }
+  }
+
+  // Auto-generate certificate in .ssl directory
+  const sslDir = join(process.cwd(), ".ssl");
+  const defaultCertPath = join(sslDir, "cert.pem");
+  const defaultKeyPath = join(sslDir, "key.pem");
+
+  // Create .ssl directory if it doesn't exist
+  if (!existsSync(sslDir)) {
+    mkdirSync(sslDir, { recursive: true });
+  }
+
+  // Check if certificate already exists
+  if (existsSync(defaultCertPath) && existsSync(defaultKeyPath)) {
+    console.log(
+      `${LOG_PREFIX} 📜 Using existing self-signed certificate at ${defaultCertPath}`,
+    );
+    const cert = readFileSync(defaultCertPath, "utf-8");
+    const key = readFileSync(defaultKeyPath, "utf-8");
+    return { cert, key };
+  }
+
+  // Generate new certificate
+  console.log(
+    `${LOG_PREFIX} 🔐 Generating self-signed SSL certificate for ${sslHost}...`,
+  );
+  try {
+    await generateSelfSignedCert(defaultCertPath, defaultKeyPath, sslHost);
+    console.log(`${LOG_PREFIX} ✅ Certificate generated at ${defaultCertPath}`);
+    const cert = readFileSync(defaultCertPath, "utf-8");
+    const key = readFileSync(defaultKeyPath, "utf-8");
+    return { cert, key };
+  } catch (error) {
+    throw new Error(
+      `Failed to generate SSL certificate: ${error}. Make sure OpenSSL is installed.`,
+    );
+  }
+}
 
 export interface ServerOptions {
   port: number;
@@ -21,9 +137,13 @@ export interface ServerOptions {
   proxyHost?: string; // Host to proxy unmatched requests to (default: "localhost")
   authUser?: string; // Username for HTTP Basic Auth (optional)
   authPassword?: string; // Password for HTTP Basic Auth (optional)
+  ssl?: boolean; // Enable SSL/HTTPS mode
+  sslCert?: string; // Path to SSL certificate file (optional, auto-generated if not provided)
+  sslKey?: string; // Path to SSL private key file (optional, auto-generated if not provided)
+  sslHost?: string; // Hostname for certificate (default: "localhost")
 }
 
-export function startServer(options: ServerOptions): void {
+export async function startServer(options: ServerOptions): Promise<void> {
   const {
     port,
     envPath,
@@ -35,7 +155,22 @@ export function startServer(options: ServerOptions): void {
     proxyHost = "localhost",
     authUser,
     authPassword,
+    ssl,
+    sslCert,
+    sslKey,
+    sslHost = "localhost",
   } = options;
+
+  // Get SSL certificates if SSL is enabled
+  let tlsConfig: { key: string; cert: string } | undefined;
+  if (ssl) {
+    try {
+      tlsConfig = await getSSLCertificates(sslCert, sslKey, sslHost);
+    } catch (error) {
+      console.error(`${LOG_PREFIX} ❌ SSL Error:`, error);
+      process.exit(1);
+    }
+  }
 
   // Initialize process manager
   const processManager = new ProcessManager({ command, envPath });
@@ -282,9 +417,11 @@ export function startServer(options: ServerOptions): void {
     req: Request,
     targetHost: string,
     targetPort: number,
+    useHttps: boolean = false,
   ): Promise<Response> {
     const url = new URL(req.url);
-    const targetUrl = `http://${targetHost}:${targetPort}${url.pathname}${url.search}`;
+    const protocol = useHttps ? "https" : "http";
+    const targetUrl = `${protocol}://${targetHost}:${targetPort}${url.pathname}${url.search}`;
 
     try {
       const proxyReq = new Request(targetUrl, {
@@ -303,10 +440,10 @@ export function startServer(options: ServerOptions): void {
   }
 
   // Start the server
-  const server = serve({
+  const serverConfig: any = {
     port,
     routes,
-    async fetch(req) {
+    async fetch(req: Request) {
       // Check authentication first (applies to all routes)
       const authResponse = checkAuth(req);
       if (authResponse) {
@@ -329,28 +466,48 @@ export function startServer(options: ServerOptions): void {
         }
 
         // Proxy all other requests to the target host/port
-        return await proxyRequest(req, proxyHost, proxyPort);
+        return await proxyRequest(req, proxyHost, proxyPort, ssl);
       }
 
       // Handle any unmatched routes
       return new Response("Not Found", { status: 404 });
     },
-  });
+  };
 
+  // Add TLS configuration if SSL is enabled
+  if (tlsConfig) {
+    serverConfig.tls = {
+      key: tlsConfig.key,
+      cert: tlsConfig.cert,
+    };
+  }
+
+  const server = serve(serverConfig);
+
+  const protocol = ssl ? "https" : "http";
   console.log(
-    `${LOG_PREFIX} 🚀 Config manager running on http://localhost:${port}`,
+    `${LOG_PREFIX} 🚀 Config manager running on ${protocol}://localhost:${port}`,
   );
   console.log(`${LOG_PREFIX} 📝 Config file: ${envPath}`);
   console.log(`${LOG_PREFIX} 🔄 Managing process: ${command.join(" ")}`);
   console.log(
-    `${LOG_PREFIX} 🌐 UI available at http://localhost:${port}${htmlRoute}`,
+    `${LOG_PREFIX} 🌐 UI available at ${protocol}://localhost:${port}${htmlRoute}`,
   );
+  if (ssl) {
+    console.log(`${LOG_PREFIX} 🔐 SSL/HTTPS enabled`);
+    if (!sslCert || !sslKey) {
+      console.log(
+        `${LOG_PREFIX} ⚠️  Using self-signed certificate. Browsers will show a security warning.`,
+      );
+    }
+  }
   if (authUser && authPassword) {
     console.log(`${LOG_PREFIX} 🔒 HTTP Basic Auth enabled`);
   }
   if (proxyPort) {
+    const proxyProtocol = ssl ? "https" : "http";
     console.log(
-      `${LOG_PREFIX} 🔀 Proxying unmatched requests to http://${proxyHost}:${proxyPort}`,
+      `${LOG_PREFIX} 🔀 Proxying unmatched requests to ${proxyProtocol}://${proxyHost}:${proxyPort}`,
     );
   }
 }

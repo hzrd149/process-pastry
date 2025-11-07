@@ -52,6 +52,12 @@ bun run index.ts --cmd "node app.js" --auth-user admin --auth-password secret
 
 # With HTTP Basic Auth using environment variables
 PROCESS_PASTRY_AUTH_USER=admin PROCESS_PASTRY_AUTH_PASSWORD=secret bun run index.ts --cmd "node app.js"
+
+# With SSL/HTTPS (auto-generates self-signed certificate)
+bun run index.ts --cmd "node app.js" --env .env --ssl
+
+# With SSL/HTTPS using custom certificate
+bun run index.ts --cmd "node app.js" --env .env --ssl --ssl-cert ./cert.pem --ssl-key ./key.pem
 ```
 
 **Note:** If no `--html` option is provided, a default UI will be automatically served at the root route.
@@ -68,6 +74,10 @@ PROCESS_PASTRY_AUTH_USER=admin PROCESS_PASTRY_AUTH_PASSWORD=secret bun run index
 - `--proxy-host <host>` - Host to proxy unmatched requests to (default: `localhost`)
 - `--auth-user <user>` - Username for HTTP Basic Auth (optional, can also use `PROCESS_PASTRY_AUTH_USER` env var)
 - `--auth-password <pass>` - Password for HTTP Basic Auth (optional, can also use `PROCESS_PASTRY_AUTH_PASSWORD` env var)
+- `--ssl, --https` - Enable SSL/HTTPS mode (will auto-generate self-signed certificate if not provided)
+- `--ssl-cert <path>` - Path to SSL certificate file (optional, auto-generated if not provided)
+- `--ssl-key <path>` - Path to SSL private key file (optional, auto-generated if not provided)
+- `--ssl-host <hostname>` - Hostname for certificate (default: `localhost`)
 - `--help` - Show help message
 
 ## API Endpoints
@@ -611,6 +621,58 @@ const response = await fetch("/process-pastry/api/config", {
 - Both username and password must be provided if authentication is enabled
 - CLI arguments take precedence over environment variables
 - All routes are protected when auth is enabled (UI, static assets, and API endpoints)
+
+#### SSL/HTTPS Support
+
+process-pastry supports SSL/HTTPS to encrypt sensitive environment variables and API communications. You can use either auto-generated self-signed certificates or provide your own certificates.
+
+**Basic Usage:**
+
+```bash
+# Enable SSL with auto-generated self-signed certificate
+bun run index.ts --cmd "node app.js" --env .env --ssl
+```
+
+When `--ssl` is enabled without providing certificate paths, process-pastry will:
+
+1. Check for existing certificates in `.ssl/cert.pem` and `.ssl/key.pem` in the current working directory
+2. If not found, automatically generate a new self-signed certificate valid for 365 days
+3. Save the certificate to `.ssl/` directory for reuse
+
+**Using Custom Certificates:**
+
+```bash
+# Use your own certificate files
+bun run index.ts --cmd "node app.js" --env .env --ssl --ssl-cert ./cert.pem --ssl-key ./key.pem
+```
+
+**Custom Hostname:**
+
+```bash
+# Generate certificate for a specific hostname
+bun run index.ts --cmd "node app.js" --env .env --ssl --ssl-host example.com
+```
+
+**Generating Your Own Self-Signed Certificate:**
+
+If you prefer to generate certificates manually using OpenSSL:
+
+```bash
+# Generate a self-signed certificate (valid for 365 days)
+openssl req -x509 -newkey rsa:2048 -keyout key.pem -out cert.pem -days 365 -nodes \
+  -subj "/CN=localhost/O=process-pastry/C=US"
+```
+
+**Security Considerations:**
+
+- **Self-signed certificates**: Browsers will show a security warning because the certificate is not signed by a trusted Certificate Authority (CA). This is expected and safe for local development or internal networks. Users can click "Advanced" and proceed to the site.
+- **Production use**: For production environments, consider using certificates from a trusted CA (e.g., Let's Encrypt) or your organization's internal CA.
+- **Certificate storage**: Auto-generated certificates are stored in `.ssl/` directory. Make sure to add `.ssl/` to your `.gitignore` if you don't want to commit certificates to version control.
+
+**Requirements:**
+
+- OpenSSL must be installed on your system for automatic certificate generation
+- If OpenSSL is not available, you must provide your own certificate files using `--ssl-cert` and `--ssl-key`
 
 #### Request Proxying
 

@@ -12,6 +12,10 @@ export interface CLIOptions {
   proxyHost?: string;
   authUser?: string;
   authPassword?: string;
+  ssl?: boolean;
+  sslCert?: string;
+  sslKey?: string;
+  sslHost?: string;
   help?: boolean;
 }
 
@@ -41,6 +45,14 @@ export function parseArgs(args: string[]): CLIOptions {
       options.authUser = args[++i];
     } else if (arg === "--auth-password") {
       options.authPassword = args[++i];
+    } else if (arg === "--ssl" || arg === "--https") {
+      options.ssl = true;
+    } else if (arg === "--ssl-cert") {
+      options.sslCert = args[++i];
+    } else if (arg === "--ssl-key") {
+      options.sslKey = args[++i];
+    } else if (arg === "--ssl-host") {
+      options.sslHost = args[++i];
     } else if (arg === "--help") {
       options.help = true;
     }
@@ -64,6 +76,10 @@ Options:
   --proxy-host <host>     Host to proxy unmatched requests to (default: localhost)
   --auth-user <user>      Username for HTTP Basic Auth (optional, can also use PROCESS_PASTRY_AUTH_USER env var)
   --auth-password <pass>  Password for HTTP Basic Auth (optional, can also use PROCESS_PASTRY_AUTH_PASSWORD env var)
+  --ssl, --https          Enable SSL/HTTPS mode (will auto-generate self-signed certificate if not provided)
+  --ssl-cert <path>       Path to SSL certificate file (optional, auto-generated if not provided)
+  --ssl-key <path>        Path to SSL private key file (optional, auto-generated if not provided)
+  --ssl-host <hostname>   Hostname for certificate (default: localhost)
   --help                  Show this help message
 
 Examples:
@@ -72,6 +88,8 @@ Examples:
   process-pastry --cmd "node app.js" --html ./ui.html --html-route /config
   process-pastry --cmd "node app.js" --html ./ui.html --html-route /config --proxy-port 4000
   process-pastry --cmd "node app.js" --html ./ui.html --html-route /config --proxy-port 4000 --proxy-host 192.168.1.100
+  process-pastry --cmd "node app.js" --env .env --ssl
+  process-pastry --cmd "node app.js" --env .env --ssl --ssl-cert ./cert.pem --ssl-key ./key.pem
 `);
 }
 
@@ -139,5 +157,12 @@ export function runCLI(): void {
     proxyHost: options.proxyHost,
     authUser,
     authPassword,
+    ssl: options.ssl,
+    sslCert: options.sslCert,
+    sslKey: options.sslKey,
+    sslHost: options.sslHost || "localhost",
+  }).catch((error) => {
+    console.error("Failed to start server:", error);
+    process.exit(1);
   });
 }
