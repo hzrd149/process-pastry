@@ -1,0 +1,38 @@
+{
+  "name": "process-pastry",
+  "version": "0.1.0",
+  "description": "A reusable Bun app for managing process configuration via a web UI",
+  "module": "index.ts",
+  "type": "module",
+  "main": "index.ts",
+  "scripts": {
+    "format": "prettier -w .",
+    "dev": "bun run index.ts --cmd \"bun run example/index.ts\" --env .env.example --port 3000"
+  },
+  "bin": {
+    "process-pastry": "./index.ts"
+  },
+  "exports": {
+    ".": "./index.ts",
+    "./server": "./src/server.ts",
+    "./process-manager": "./src/process-manager.ts",
+    "./config-handler": "./src/config-handler.ts"
+  },
+  "keywords": [
+    "bun",
+    "config",
+    "process-manager",
+    "env",
+    "ui"
+  ],
+  "author": "",
+  "license": "MIT",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "prettier": "^3.6.2"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  }
+}

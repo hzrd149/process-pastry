@@ -1,0 +1,567 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Process Config Manager</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+
+      body {
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto,
+          "Helvetica Neue", Arial, sans-serif;
+        background: #f5f5f5;
+        padding: 20px;
+        color: #333;
+      }
+
+      .container {
+        max-width: 800px;
+        margin: 0 auto;
+      }
+
+      .header {
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      h1 {
+        font-size: 28px;
+        margin-bottom: 12px;
+        color: #1a1a1a;
+      }
+
+      .status {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        font-size: 14px;
+        color: #666;
+      }
+
+      .status-indicator {
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background: #ef4444;
+        animation: pulse 2s infinite;
+      }
+
+      .status-indicator.running {
+        background: #22c55e;
+        animation: none;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.5;
+        }
+      }
+
+      .card {
+        background: white;
+        padding: 24px;
+        border-radius: 8px;
+        margin-bottom: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+
+      .card h2 {
+        font-size: 20px;
+        margin-bottom: 16px;
+        color: #1a1a1a;
+      }
+
+      .form-group {
+        margin-bottom: 20px;
+      }
+
+      label {
+        display: block;
+        font-weight: 500;
+        margin-bottom: 8px;
+        color: #333;
+        font-size: 14px;
+      }
+
+      input,
+      textarea {
+        width: 100%;
+        padding: 10px 12px;
+        border: 1px solid #ddd;
+        border-radius: 6px;
+        font-family: "Courier New", monospace;
+        font-size: 14px;
+        transition:
+          border-color 0.2s,
+          box-shadow 0.2s;
+      }
+
+      input:focus,
+      textarea:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+      }
+
+      textarea {
+        min-height: 80px;
+        resize: vertical;
+      }
+
+      .button-group {
+        display: flex;
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      button {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 14px;
+        transition: all 0.2s;
+        flex: 1;
+      }
+
+      button.primary {
+        background: #3b82f6;
+        color: white;
+      }
+
+      button.primary:hover {
+        background: #2563eb;
+      }
+
+      button.secondary {
+        background: #6b7280;
+        color: white;
+      }
+
+      button.secondary:hover {
+        background: #4b5563;
+      }
+
+      button:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+      }
+
+      button:active {
+        transform: scale(0.98);
+      }
+
+      .alert {
+        padding: 12px 16px;
+        border-radius: 6px;
+        margin-bottom: 16px;
+        font-size: 14px;
+        display: none;
+      }
+
+      .alert.show {
+        display: block;
+      }
+
+      .alert.success {
+        background: #dcfce7;
+        color: #166534;
+        border: 1px solid #86efac;
+      }
+
+      .alert.error {
+        background: #fee2e2;
+        color: #991b1b;
+        border: 1px solid #fca5a5;
+      }
+
+      .alert.warning {
+        background: #fef3c7;
+        color: #92400e;
+        border: 1px solid #fde047;
+      }
+
+      .error-log {
+        background: #1f2937;
+        color: #f3f4f6;
+        padding: 16px;
+        border-radius: 6px;
+        font-family: "Courier New", monospace;
+        font-size: 12px;
+        max-height: 300px;
+        overflow-y: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        border: 1px solid #374151;
+        line-height: 1.6;
+      }
+
+      .env-vars {
+        display: grid;
+        gap: 16px;
+      }
+
+      .env-var-item {
+        display: flex;
+        gap: 12px;
+        align-items: flex-start;
+      }
+
+      .env-var-item input {
+        flex: 1;
+      }
+
+      .env-var-item button {
+        padding: 10px 16px;
+        background: #dc2626;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 12px;
+        flex: 0 0 auto;
+      }
+
+      .env-var-item button:hover {
+        background: #b91c1c;
+      }
+
+      .add-var {
+        display: flex;
+        gap: 12px;
+        margin-top: 16px;
+      }
+
+      .add-var input {
+        flex: 1;
+      }
+
+      .add-var button {
+        flex: 0 0 auto;
+        background: #10b981;
+        color: white;
+      }
+
+      .add-var button:hover {
+        background: #059669;
+      }
+
+      .empty-state {
+        text-align: center;
+        padding: 40px;
+        color: #6b7280;
+      }
+
+      .empty-state p {
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="container">
+      <div class="header">
+        <h1>⚙️ Process Config Manager</h1>
+        <div class="status">
+          <div class="status-indicator" id="statusIndicator"></div>
+          <span id="statusText">Checking status...</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>Environment Variables</h2>
+        <div id="alert" class="alert"></div>
+
+        <div id="envVarsContainer" class="env-vars">
+          <!-- Environment variables will be dynamically added here -->
+        </div>
+
+        <div class="add-var">
+          <input
+            type="text"
+            id="newVarKey"
+            placeholder="Variable name (e.g., PORT)"
+          />
+          <input
+            type="text"
+            id="newVarValue"
+            placeholder="Value (e.g., 3000)"
+          />
+          <button type="button" id="addVarBtn">Add Variable</button>
+        </div>
+
+        <div class="button-group">
+          <button class="primary" id="saveBtn" type="button">
+            💾 Save & Restart
+          </button>
+          <button class="secondary" id="saveNoRestartBtn" type="button">
+            💾 Save (No Restart)
+          </button>
+        </div>
+      </div>
+
+      <div class="card" id="errorCard" style="display: none">
+        <h2 style="margin-bottom: 12px; color: #991b1b">❌ Process Error</h2>
+        <div class="error-log" id="errorLog"></div>
+      </div>
+    </div>
+
+    <script type="module">
+      const statusIndicator = document.getElementById("statusIndicator");
+      const statusText = document.getElementById("statusText");
+      const alertDiv = document.getElementById("alert");
+      const envVarsContainer = document.getElementById("envVarsContainer");
+      const errorCard = document.getElementById("errorCard");
+      const errorLog = document.getElementById("errorLog");
+      const saveBtn = document.getElementById("saveBtn");
+      const saveNoRestartBtn = document.getElementById("saveNoRestartBtn");
+      const addVarBtn = document.getElementById("addVarBtn");
+      const newVarKey = document.getElementById("newVarKey");
+      const newVarValue = document.getElementById("newVarValue");
+
+      let envVars = {};
+
+      function showAlert(message, type) {
+        alertDiv.className = `alert ${type} show`;
+        alertDiv.textContent = message;
+        setTimeout(() => {
+          alertDiv.className = "alert";
+          alertDiv.textContent = "";
+        }, 5000);
+      }
+
+      function renderEnvVars() {
+        envVarsContainer.innerHTML = "";
+
+        if (Object.keys(envVars).length === 0) {
+          envVarsContainer.innerHTML = `
+          <div class="empty-state">
+            <p>No environment variables configured</p>
+            <p style="font-size: 12px; margin-top: 4px;">Add a variable above to get started</p>
+          </div>
+        `;
+          return;
+        }
+
+        Object.entries(envVars).forEach(([key, value]) => {
+          const item = document.createElement("div");
+          item.className = "env-var-item";
+          item.innerHTML = `
+          <input
+            type="text"
+            value="${key}"
+            data-key="${key}"
+            class="var-key"
+            placeholder="Variable name"
+          />
+          <input
+            type="text"
+            value="${value}"
+            data-key="${key}"
+            class="var-value"
+            placeholder="Value"
+          />
+          <button type="button" class="delete-var" data-key="${key}">Delete</button>
+        `;
+          envVarsContainer.appendChild(item);
+        });
+
+        // Add event listeners
+        document.querySelectorAll(".var-key").forEach((input) => {
+          input.addEventListener("change", (e) => {
+            const oldKey = e.target.dataset.key;
+            const newKey = e.target.value.trim();
+            if (newKey && newKey !== oldKey) {
+              envVars[newKey] = envVars[oldKey];
+              delete envVars[oldKey];
+              e.target.dataset.key = newKey;
+              e.target
+                .closest(".env-var-item")
+                .querySelector(".var-value").dataset.key = newKey;
+              e.target
+                .closest(".env-var-item")
+                .querySelector(".delete-var").dataset.key = newKey;
+            }
+          });
+        });
+
+        document.querySelectorAll(".var-value").forEach((input) => {
+          input.addEventListener("change", (e) => {
+            const key = e.target.dataset.key;
+            envVars[key] = e.target.value;
+          });
+        });
+
+        document.querySelectorAll(".delete-var").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            const key = e.target.dataset.key;
+            delete envVars[e.target.dataset.key];
+            renderEnvVars();
+          });
+        });
+      }
+
+      async function loadConfig() {
+        try {
+          const res = await fetch("/api/config");
+          if (!res.ok) throw new Error("Failed to load config");
+          envVars = await res.json();
+          renderEnvVars();
+        } catch (error) {
+          showAlert(`Failed to load config: ${error.message}`, "error");
+        }
+      }
+
+      async function updateStatus() {
+        try {
+          const res = await fetch("/api/status");
+          if (!res.ok) throw new Error("Failed to get status");
+          const status = await res.json();
+
+          statusIndicator.className = `status-indicator ${status.running ? "running" : ""}`;
+          statusText.textContent = status.running
+            ? `✓ Process Running${status.pid ? ` (PID: ${status.pid})` : ""}`
+            : "✗ Process Stopped";
+
+          if (status.lastError) {
+            errorCard.style.display = "block";
+            errorLog.textContent = status.lastError;
+          } else {
+            errorCard.style.display = "none";
+          }
+        } catch (error) {
+          console.error("Failed to update status:", error);
+        }
+      }
+
+      async function saveConfig(restart = true) {
+        // Collect current values from inputs
+        const currentVars = {};
+        document.querySelectorAll(".env-var-item").forEach((item) => {
+          const keyInput = item.querySelector(".var-key");
+          const valueInput = item.querySelector(".var-value");
+          if (keyInput && valueInput) {
+            const key = keyInput.value.trim();
+            const value = valueInput.value.trim();
+            if (key) {
+              currentVars[key] = value;
+            }
+          }
+        });
+
+        if (Object.keys(currentVars).length === 0) {
+          showAlert("Please add at least one environment variable", "warning");
+          return;
+        }
+
+        saveBtn.disabled = true;
+        saveNoRestartBtn.disabled = true;
+        saveBtn.textContent = restart
+          ? "🔄 Saving & Restarting..."
+          : "💾 Saving...";
+        saveNoRestartBtn.textContent = "💾 Saving...";
+
+        try {
+          const headers = {
+            "Content-Type": "application/json",
+          };
+
+          if (!restart) {
+            headers["X-Restart-Process"] = "false";
+          }
+
+          const res = await fetch("/api/config", {
+            method: "POST",
+            headers,
+            body: JSON.stringify(currentVars),
+          });
+
+          const result = await res.json();
+
+          if (result.success) {
+            envVars = currentVars;
+            if (result.error) {
+              showAlert(
+                `⚠️ Config saved but process error: ${result.error}`,
+                "warning",
+              );
+            } else {
+              showAlert(
+                restart
+                  ? "✓ Config saved and process restarted successfully!"
+                  : "✓ Config saved successfully!",
+                "success",
+              );
+            }
+          } else {
+            showAlert(`Error: ${result.error}`, "error");
+          }
+        } catch (error) {
+          showAlert(`Failed to save config: ${error.message}`, "error");
+        } finally {
+          saveBtn.disabled = false;
+          saveNoRestartBtn.disabled = false;
+          saveBtn.textContent = "💾 Save & Restart";
+          saveNoRestartBtn.textContent = "💾 Save (No Restart)";
+          updateStatus();
+        }
+      }
+
+      addVarBtn.addEventListener("click", () => {
+        const key = newVarKey.value.trim();
+        const value = newVarValue.value.trim();
+
+        if (!key) {
+          showAlert("Please enter a variable name", "warning");
+          return;
+        }
+
+        if (envVars[key]) {
+          showAlert(`Variable ${key} already exists`, "warning");
+          return;
+        }
+
+        envVars[key] = value;
+        newVarKey.value = "";
+        newVarValue.value = "";
+        renderEnvVars();
+      });
+
+      saveBtn.addEventListener("click", () => saveConfig(true));
+      saveNoRestartBtn.addEventListener("click", () => saveConfig(false));
+
+      // Allow Enter key to add variable
+      newVarKey.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          newVarValue.focus();
+        }
+      });
+
+      newVarValue.addEventListener("keypress", (e) => {
+        if (e.key === "Enter") {
+          addVarBtn.click();
+        }
+      });
+
+      // Initial load
+      loadConfig();
+      updateStatus();
+
+      // Poll status every 2 seconds
+      setInterval(updateStatus, 2000);
+    </script>
+  </body>
+</html>
