@@ -412,6 +412,14 @@ export async function startServer(options: ServerOptions): Promise<void> {
     },
   };
 
+  routes[`${API_PREFIX}/existing`] = {
+    GET() {
+      // Return only the names of existing environment variables (not values for security)
+      const variables = Object.keys(process.env);
+      return Response.json({ variables });
+    },
+  };
+
   // Helper function to proxy requests to another host/port
   async function proxyRequest(
     req: Request,

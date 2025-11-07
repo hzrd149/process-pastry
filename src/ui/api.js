@@ -26,6 +26,24 @@ export async function loadSchema() {
 }
 
 /**
+ * Load existing environment variables from process.env
+ * @returns {Promise<boolean>} Success status
+ */
+export async function loadExistingEnvVars() {
+  try {
+    const res = await fetch(`${API_PREFIX}/existing`);
+    if (!res.ok) throw new Error("Failed to load existing env vars");
+    const data = await res.json();
+    state.existingEnvVars = new Set(data.variables || []);
+    return true;
+  } catch (error) {
+    console.warn("Failed to load existing env vars:", error);
+    state.existingEnvVars = new Set();
+    return false;
+  }
+}
+
+/**
  * Load current configuration from the server
  * @returns {Promise<boolean>} Success status
  */

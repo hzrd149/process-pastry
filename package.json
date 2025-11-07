@@ -1,6 +1,6 @@
 {
   "name": "process-pastry",
-  "version": "0.1.2",
+  "version": "0.2.0",
   "description": "A reusable Bun app for managing process configuration via a web UI",
   "module": "index.ts",
   "type": "module",

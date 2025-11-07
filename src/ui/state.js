@@ -7,6 +7,7 @@ export const state = {
   originalEnvVars: {}, // Track original values to detect changes
   envSchema: {},
   hiddenVars: new Set(), // Track variables user has explicitly removed
+  existingEnvVars: new Set(), // Track variables that exist in process.env
   hasUnsavedChanges: false,
 };
 
@@ -18,6 +19,7 @@ export function resetState() {
   state.originalEnvVars = {};
   state.envSchema = {};
   state.hiddenVars = new Set();
+  state.existingEnvVars = new Set();
   state.hasUnsavedChanges = false;
 }
 

@@ -483,3 +483,36 @@ button:active {
 .env-var-item.modified .var-value {
   border-color: #fbbf24;
 }
+
+.var-key-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.var-key-row .var-key {
+  flex: 1;
+}
+
+.override-badge {
+  font-size: 10px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  background: #fef3c7;
+  color: #92400e;
+  border: 1px solid #fde047;
+  white-space: nowrap;
+  font-weight: 500;
+  cursor: help;
+}
+
+.example-var-warning {
+  font-size: 11px;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #fde047;
+  padding: 6px 8px;
+  border-radius: 4px;
+  margin-top: 8px;
+}

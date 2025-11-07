@@ -3,7 +3,13 @@
  */
 
 import { state } from "./state.js";
-import { loadSchema, loadConfig, updateStatus, saveConfig } from "./api.js";
+import {
+  loadSchema,
+  loadConfig,
+  loadExistingEnvVars,
+  updateStatus,
+  saveConfig,
+} from "./api.js";
 import {
   renderEnvVars,
   renderExampleVars,
@@ -30,6 +36,7 @@ export async function init() {
 
   // Initial load
   await loadSchema();
+  await loadExistingEnvVars();
   await loadConfig();
   renderEnvVars();
   renderExampleVars();
@@ -78,6 +85,14 @@ export async function init() {
     const finalValue = value || state.envSchema[key]?.defaultValue || "";
     state.envVars[key] = finalValue;
     // Don't set originalEnvVars for new variables - this marks them as modified
+
+    // Warn if this variable overrides an existing process.env variable
+    if (state.existingEnvVars.has(key)) {
+      showAlert(
+        `⚠️ Variable ${key} will override an existing environment variable`,
+        "warning",
+      );
+    }
 
     newVarKey.value = "";
     newVarValue.value = "";

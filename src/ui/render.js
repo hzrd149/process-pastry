@@ -82,6 +82,13 @@ export function renderExampleVars() {
       defaultHtml = `<div class="example-var-default">Default: ${escapeHtml(schema.defaultValue)}</div>`;
     }
 
+    // Check if this variable already exists in process.env
+    const isOverriding = state.existingEnvVars.has(key);
+    let overrideWarning = "";
+    if (isOverriding) {
+      overrideWarning = `<div class="example-var-warning">⚠ This will override an existing environment variable</div>`;
+    }
+
     item.innerHTML = `
       <div class="example-var-header">
         <span class="example-var-name">${escapeHtml(key)}</span>
@@ -91,6 +98,7 @@ export function renderExampleVars() {
       </div>
       ${descriptionHtml}
       ${defaultHtml}
+      ${overrideWarning}
     `;
     exampleVarsContainer.appendChild(item);
   });
@@ -109,7 +117,15 @@ export function renderExampleVars() {
       renderEnvVars();
       renderExampleVars();
       updateVarPresets();
-      showAlert(`Added ${key} to configuration`, "success");
+      // Show warning if overriding existing env var, otherwise success
+      if (state.existingEnvVars.has(key)) {
+        showAlert(
+          `⚠️ Added ${key} (overrides existing environment variable)`,
+          "warning",
+        );
+      } else {
+        showAlert(`Added ${key} to configuration`, "success");
+      }
     });
   });
 }
@@ -152,15 +168,25 @@ export function renderEnvVars() {
       const isModified = state.originalEnvVars[key] !== value;
       const modifiedClass = isModified ? "modified" : "";
 
+      // Check if this variable overrides an existing process.env variable
+      const isOverriding = state.existingEnvVars.has(key);
+      let overrideBadge = "";
+      if (isOverriding) {
+        overrideBadge = `<span class="override-badge" title="This variable overrides an existing environment variable">⚠ Overrides existing</span>`;
+      }
+
       item.innerHTML = `
         <div class="env-var-item-row">
-          <input
-            type="text"
-            value="${escapeHtml(key)}"
-            data-key="${escapeHtml(key)}"
-            class="var-key"
-            placeholder="Variable name"
-          />
+          <div class="var-key-row">
+            <input
+              type="text"
+              value="${escapeHtml(key)}"
+              data-key="${escapeHtml(key)}"
+              class="var-key"
+              placeholder="Variable name"
+            />
+            ${overrideBadge}
+          </div>
           <div class="var-value-row">
             <input
               type="text"

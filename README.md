@@ -360,6 +360,20 @@ Returns the schema metadata from `.env.example` file (if available). This includ
 }
 ```
 
+### `GET /process-pastry/api/existing`
+
+Returns the names of environment variables that already exist in `process.env`. This is useful for identifying which variables from your `.env` file will override existing system/environment variables.
+
+**Response:**
+
+```json
+{
+  "variables": ["PATH", "HOME", "USER", "NODE_ENV", "PORT"]
+}
+```
+
+**Note:** Only variable names are returned (not values) for security reasons. Variables listed here are those that exist in the parent process's environment and will be overridden by variables with the same name in your `.env` file.
+
 ## Creating a Custom Config UI
 
 This section provides a complete guide for creating custom configuration UIs that work with process-pastry. You can copy and paste this entire section to AI agents or other developers.
@@ -466,6 +480,24 @@ All endpoints are served at `/process-pastry/api/*`:
   const response = await fetch("/process-pastry/api/example");
   const schema = await response.json();
   // { "PORT": { description: "Server port", defaultValue: "3000", commented: false } }
+  ```
+
+#### `GET /process-pastry/api/existing`
+
+- **Purpose**: Get list of environment variable names that exist in `process.env`
+- **Response**: `{ variables: string[] }` - Array of variable names (values not included for security)
+- **Example**:
+
+  ```javascript
+  const response = await fetch("/process-pastry/api/existing");
+  const data = await response.json();
+  // { variables: ["PATH", "HOME", "USER", "NODE_ENV", "PORT"] }
+
+  // Check if a variable will override an existing one
+  const willOverride = data.variables.includes("PORT");
+  if (willOverride) {
+    console.warn("PORT will override an existing environment variable");
+  }
   ```
 
 ### Basic HTML Template
@@ -724,6 +756,29 @@ Object.entries(schema).forEach(([key, meta]) => {
   console.log(`${key}: ${meta.description}`);
   if (meta.defaultValue) {
     console.log(`  Default: ${meta.defaultValue}`);
+  }
+});
+```
+
+#### Checking for Existing Environment Variables
+
+You can check which variables from your `.env` file will override existing `process.env` variables:
+
+```javascript
+// Load existing environment variables
+const existingRes = await fetch("/process-pastry/api/existing");
+const { variables: existingVars } = await existingRes.json();
+const existingSet = new Set(existingVars);
+
+// Check if a variable will override an existing one
+function willOverride(varName) {
+  return existingSet.has(varName);
+}
+
+// Show warnings for variables that override existing ones
+Object.keys(config).forEach((key) => {
+  if (willOverride(key)) {
+    console.warn(`⚠️ ${key} will override an existing environment variable`);
   }
 });
 ```
