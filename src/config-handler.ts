@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { resolve, dirname, join } from "path";
 
 /**
@@ -61,6 +61,12 @@ export function writeEnv(
   config: Record<string, string>,
 ): void {
   const resolvedPath = resolve(envPath);
+
+  // Ensure the directory exists before writing the file
+  const dir = dirname(resolvedPath);
+  if (!existsSync(dir)) {
+    mkdirSync(dir, { recursive: true });
+  }
 
   const content = Object.entries(config)
     .map(([key, value]) => {
