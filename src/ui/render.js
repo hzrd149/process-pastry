@@ -161,14 +161,16 @@ export function renderEnvVars() {
             class="var-key"
             placeholder="Variable name"
           />
-          <input
-            type="text"
-            value="${escapeHtml(value)}"
-            data-key="${escapeHtml(key)}"
-            class="var-value"
-            placeholder="${escapeHtml(schema?.defaultValue || "Value")}"
-          />
-          <button type="button" class="delete-var" data-key="${escapeHtml(key)}">Delete</button>
+          <div class="var-value-row">
+            <input
+              type="text"
+              value="${escapeHtml(value)}"
+              data-key="${escapeHtml(key)}"
+              class="var-value"
+              placeholder="${escapeHtml(schema?.defaultValue || "Value")}"
+            />
+            <button type="button" class="delete-var" data-key="${escapeHtml(key)}">Delete</button>
+          </div>
         </div>
         ${descriptionHtml}
       `;

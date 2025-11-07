@@ -228,12 +228,26 @@ button:active {
 
 .env-var-item-row {
   display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.env-var-item-row .var-key {
+  width: 100%;
+}
+
+.var-value-row {
+  display: flex;
   gap: 12px;
   align-items: flex-start;
 }
 
-.env-var-item input {
+.var-value-row .var-value {
   flex: 1;
+}
+
+.var-value-row .delete-var {
+  flex: 0 0 auto;
 }
 
 .env-var-description {
@@ -402,15 +416,26 @@ button:active {
 
 .add-var {
   display: flex;
+  flex-direction: column;
   gap: 12px;
   margin-top: 16px;
 }
 
-.add-var input {
+.add-var #newVarKey {
+  width: 100%;
+}
+
+.add-var-value-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.add-var-value-row #newVarValue {
   flex: 1;
 }
 
-.add-var button {
+.add-var-value-row button {
   flex: 0 0 auto;
   background: #10b981;
   color: white;
@@ -423,7 +448,7 @@ button:active {
   font-style: italic;
 }
 
-.add-var button:hover {
+.add-var-value-row button:hover {
   background: #059669;
 }
 

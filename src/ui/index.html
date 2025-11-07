@@ -38,27 +38,27 @@
         </div>
 
         <div class="add-var">
-          <div style="flex: 1; display: flex; flex-direction: column">
-            <input
-              type="text"
-              id="newVarKey"
-              list="varPresets"
-              placeholder="Variable name (e.g., PORT)"
-              autocomplete="off"
-            />
-            <datalist id="varPresets"></datalist>
-            <div
-              class="var-preset-hint"
-              id="presetHint"
-              style="display: none"
-            ></div>
-          </div>
           <input
             type="text"
-            id="newVarValue"
-            placeholder="Value (e.g., 3000)"
+            id="newVarKey"
+            list="varPresets"
+            placeholder="Variable name (e.g., PORT)"
+            autocomplete="off"
           />
-          <button type="button" id="addVarBtn">Add Variable</button>
+          <datalist id="varPresets"></datalist>
+          <div
+            class="var-preset-hint"
+            id="presetHint"
+            style="display: none"
+          ></div>
+          <div class="add-var-value-row">
+            <input
+              type="text"
+              id="newVarValue"
+              placeholder="Value (e.g., 3000)"
+            />
+            <button type="button" id="addVarBtn">Add Variable</button>
+          </div>
         </div>
 
         <div class="button-group">
