@@ -3,7 +3,7 @@
 // Example app for testing process-pastry
 // This app reads environment variables and runs a simple server
 
-const PORT = parseInt(process.env.PORT || "4000", 10);
+const PORT = parseInt(process.env.PORT || "8080", 10);
 const MESSAGE = process.env.MESSAGE || "Hello from example app!";
 const DELAY = parseInt(process.env.DELAY || "0", 10);
 
@@ -20,7 +20,9 @@ if (DELAY > 0) {
 // Validate required env vars (example of error handling)
 if (process.env.REQUIRED_VAR === undefined) {
   console.error("[Example App] ERROR: REQUIRED_VAR is not set!");
-  console.error("[Example App] This is a test error to demonstrate error tracking.");
+  console.error(
+    "[Example App] This is a test error to demonstrate error tracking.",
+  );
   process.exit(1);
 }
 
@@ -29,6 +31,7 @@ const server = Bun.serve({
   port: PORT,
   fetch(req) {
     const url = new URL(req.url);
+    console.log(`[Example App] Request: ${url.pathname}`);
 
     if (url.pathname === "/") {
       return new Response(
@@ -45,7 +48,7 @@ const server = Bun.serve({
         }),
         {
           headers: { "Content-Type": "application/json" },
-        }
+        },
       );
     }
 
@@ -74,4 +77,3 @@ process.on("SIGINT", () => {
   server.stop();
   process.exit(0);
 });
-

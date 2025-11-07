@@ -12,6 +12,7 @@ A CLI tool built with Bun that provides a web-based configuration interface for 
 - 🔧 **Partial Updates** - PATCH endpoint for updating only specific variables
 - ⏸️ **Skip Restart** - Optional header to save config without restarting the process
 - 📝 **Schema Support** - Optional `.env.example` file for variable descriptions and defaults
+- 🔀 **Request Proxying** - Proxy unmatched requests to another port when using custom UI
 
 ## Installation
 
@@ -35,6 +36,15 @@ bun run index.ts --cmd "node app.js" --html ./ui.html --html-route /config
 
 # With .env.example file for schema
 bun run index.ts --cmd "node app.js" --env .env --example-env .env.example
+
+# With proxy to another port (for hosting app and config UI on same port)
+bun run index.ts --cmd "node app.js" --proxy-port 8080
+
+# With custom UI and proxy to another port
+bun run index.ts --cmd "node app.js" --html ./config-ui.html --html-route /config --proxy-port 8080
+
+# With custom proxy host and port
+bun run index.ts --cmd "node app.js" --proxy-port 8080 --proxy-host 192.168.1.100
 ```
 
 **Note:** If no `--html` option is provided, a default UI will be automatically served at the root route.
@@ -47,13 +57,15 @@ bun run index.ts --cmd "node app.js" --env .env --example-env .env.example
 - `--html, -h <path>` - Path to HTML file to serve as UI (optional)
 - `--html-route <path>` - Route path for HTML UI (default: `/`)
 - `--example-env, -E <path>` - Path to `.env.example` file (auto-discovered if not provided)
+- `--proxy-port <port>` - Port to proxy unmatched requests to
+- `--proxy-host <host>` - Host to proxy unmatched requests to (default: `localhost`)
 - `--help` - Show help message
 
 ## API Endpoints
 
 The server provides the following REST API endpoints:
 
-### `GET /api/config`
+### `GET /process-pastry/api/config`
 
 Returns the current configuration as a JSON object.
 
@@ -67,7 +79,7 @@ Returns the current configuration as a JSON object.
 }
 ```
 
-### `POST /api/config`
+### `POST /process-pastry/api/config`
 
 Updates the entire configuration and optionally restarts the child process.
 
@@ -97,7 +109,7 @@ Updates the entire configuration and optionally restarts the child process.
 
 If the process fails to start, `error` will contain the error message.
 
-### `PATCH /api/config`
+### `PATCH /process-pastry/api/config`
 
 Updates only the specified environment variables (partial update) and optionally restarts the child process.
 
@@ -124,7 +136,7 @@ Updates only the specified environment variables (partial update) and optionally
 }
 ```
 
-### `GET /api/status`
+### `GET /process-pastry/api/status`
 
 Returns the current status of the managed process.
 
@@ -138,7 +150,7 @@ Returns the current status of the managed process.
 }
 ```
 
-### `GET /api/example`
+### `GET /process-pastry/api/example`
 
 Returns the schema metadata from `.env.example` file (if available). This includes variable descriptions, default values, and whether variables are commented out.
 
@@ -174,20 +186,20 @@ process-pastry serves your custom HTML file and provides REST API endpoints for 
 
 ### API Reference
 
-All endpoints are served at `/api/*`:
+All endpoints are served at `/process-pastry/api/*`:
 
-#### `GET /api/config`
+#### `GET /process-pastry/api/config`
 
 - **Purpose**: Load current environment variables
 - **Response**: `Record<string, string>` - Object mapping variable names to values
 - **Example**:
   ```javascript
-  const response = await fetch("/api/config");
+  const response = await fetch("/process-pastry/api/config");
   const config = await response.json();
   // { "PORT": "3000", "DATABASE_URL": "postgres://..." }
   ```
 
-#### `POST /api/config`
+#### `POST /process-pastry/api/config`
 
 - **Purpose**: Save entire configuration (replaces all variables)
 - **Request Body**: `Record<string, string>` - Complete config object
@@ -204,7 +216,7 @@ All endpoints are served at `/api/*`:
   ```
 - **Example**:
   ```javascript
-  const response = await fetch("/api/config", {
+  const response = await fetch("/process-pastry/api/config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ PORT: "3000", DATABASE_URL: "postgres://..." }),
@@ -212,7 +224,7 @@ All endpoints are served at `/api/*`:
   const result = await response.json();
   ```
 
-#### `PATCH /api/config`
+#### `PATCH /process-pastry/api/config`
 
 - **Purpose**: Update specific variables only (partial update)
 - **Request Body**: `Record<string, string>` - Only variables to update
@@ -228,14 +240,14 @@ All endpoints are served at `/api/*`:
   ```
 - **Example**:
   ```javascript
-  const response = await fetch("/api/config", {
+  const response = await fetch("/process-pastry/api/config", {
     method: "PATCH",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ PORT: "8080" }),
   });
   ```
 
-#### `GET /api/status`
+#### `GET /process-pastry/api/status`
 
 - **Purpose**: Check if managed process is running
 - **Response**:
@@ -248,20 +260,20 @@ All endpoints are served at `/api/*`:
   ```
 - **Example**:
   ```javascript
-  const response = await fetch("/api/status");
+  const response = await fetch("/process-pastry/api/status");
   const status = await response.json();
   if (!status.running) {
     console.error("Process stopped:", status.lastError);
   }
   ```
 
-#### `GET /api/example`
+#### `GET /process-pastry/api/example`
 
 - **Purpose**: Load variable schema from `.env.example` (optional)
 - **Response**: `Record<string, { description: string, defaultValue?: string, commented: boolean }>`
 - **Example**:
   ```javascript
-  const response = await fetch("/api/example");
+  const response = await fetch("/process-pastry/api/example");
   const schema = await response.json();
   // { "PORT": { description: "Server port", defaultValue: "3000", commented: false } }
   ```
@@ -339,8 +351,8 @@ Here's a minimal working template you can customize:
       // Load initial data
       async function loadData() {
         const [configRes, statusRes] = await Promise.all([
-          fetch("/api/config"),
-          fetch("/api/status"),
+          fetch("/process-pastry/api/config"),
+          fetch("/process-pastry/api/status"),
         ]);
         config = await configRes.json();
         status = await statusRes.json();
@@ -398,7 +410,7 @@ Here's a minimal working template you can customize:
           if (key) updated[key] = value;
         });
 
-        const response = await fetch("/api/config", {
+        const response = await fetch("/process-pastry/api/config", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(updated),
@@ -415,7 +427,7 @@ Here's a minimal working template you can customize:
 
       // Poll status
       setInterval(async () => {
-        const res = await fetch("/api/status");
+        const res = await fetch("/process-pastry/api/status");
         status = await res.json();
         updateStatus();
       }, 2000);
@@ -440,7 +452,71 @@ bun run index.ts --cmd "node app.js" --html ./config-ui.html --html-route /admin
 
 # With .env.example for schema support
 bun run index.ts --cmd "node app.js" --html ./config-ui.html --example-env .env.example
+
+# With proxy port - host your app and config UI on the same port
+bun run index.ts --cmd "node app.js" --html ./config-ui.html --html-route /config --proxy-port 8080
+
+# With custom proxy host (e.g., for remote servers or different network interfaces)
+bun run index.ts --cmd "node app.js" --html ./config-ui.html --html-route /config --proxy-port 8080 --proxy-host 192.168.1.100
 ```
+
+#### Request Proxying
+
+When you provide `--proxy-port`, process-pastry will:
+
+- Serve your config UI (default or custom) at the specified `--html-route`
+- Handle all `/process-pastry/api/*` endpoints for configuration management
+- **Proxy all other unmatched requests** to the specified `--proxy-host` and `--proxy-port`
+
+This allows you to run your application on one port (e.g., 8080) and access both your app and the config UI through the same port (e.g., 3000):
+
+- `http://localhost:3000/` (or your custom route) - Your config UI
+- `http://localhost:3000/process-pastry/api/*` - Config API endpoints
+- `http://localhost:3000/*` - Proxied to your app
+
+**Example setup (localhost with default UI):**
+
+```bash
+# Your app runs on port 8080 (configured via .env)
+# process-pastry runs on port 3000 and proxies to localhost:8080
+# Default UI is served at /
+bun run index.ts \
+  --cmd "bun run example/index.ts" \
+  --proxy-port 8080 \
+  --port 3000
+```
+
+**Example setup (localhost with custom UI):**
+
+```bash
+# Your app runs on port 8080 (configured via .env)
+# process-pastry runs on port 3000 and proxies to localhost:8080
+# Custom UI is served at /config
+bun run index.ts \
+  --cmd "bun run example/index.ts" \
+  --html ./config-ui.html \
+  --html-route /config \
+  --proxy-port 8080 \
+  --port 3000
+```
+
+**Example setup (custom host):**
+
+```bash
+# Proxy to a different host (e.g., remote server or different network interface)
+bun run index.ts \
+  --cmd "bun run example/index.ts" \
+  --html ./config-ui.html \
+  --html-route /config \
+  --proxy-port 8080 \
+  --proxy-host 192.168.1.100 \
+  --port 3000
+```
+
+Now you can access:
+
+- Your app: `http://localhost:3000/` (proxied to `http://<proxy-host>:<proxy-port>`)
+- Config UI: `http://localhost:3000/config`
 
 ### Advanced Features
 
@@ -450,7 +526,7 @@ If you provide a `.env.example` file, you can load variable descriptions and def
 
 ```javascript
 // Load schema
-const schemaRes = await fetch("/api/example");
+const schemaRes = await fetch("/process-pastry/api/example");
 const schema = await schemaRes.json();
 
 // Use schema to show descriptions
@@ -467,7 +543,7 @@ Object.entries(schema).forEach(([key, meta]) => {
 To save config without restarting the process:
 
 ```javascript
-const response = await fetch("/api/config", {
+const response = await fetch("/process-pastry/api/config", {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
@@ -483,20 +559,27 @@ Update only specific variables without sending the entire config:
 
 ```javascript
 // Only update PORT
-const response = await fetch("/api/config", {
+const response = await fetch("/process-pastry/api/config", {
   method: "PATCH",
   headers: { "Content-Type": "application/json" },
   body: JSON.stringify({ PORT: "8080" }),
 });
 ```
 
+#### Request Proxying
+
+When using `--proxy-port`, your config UI and your application can share the same port. The proxy activates whenever `--proxy-port` is provided, regardless of whether you're using the default UI or a custom HTML UI. API routes (`/process-pastry/api/*`) and your HTML route are never proxied - only unmatched requests are forwarded to the target host and port.
+
+- `--proxy-host` defaults to `localhost` if not specified
+- Use `--proxy-host` to proxy to remote servers, different network interfaces, or Docker containers
+
 ### Best Practices
 
 1. **Error Handling**: Always check `result.success` and `result.error` in API responses
-2. **Status Polling**: Poll `/api/status` periodically to show real-time process status
+2. **Status Polling**: Poll `/process-pastry/api/status` periodically to show real-time process status
 3. **Validation**: Validate variable names (typically uppercase, alphanumeric + underscores)
 4. **User Feedback**: Show loading states and success/error messages
-5. **Schema Integration**: Use `/api/example` to provide helpful descriptions and defaults
+5. **Schema Integration**: Use `/process-pastry/api/example` to provide helpful descriptions and defaults
 
 See `src/ui/` for the modular UI implementation with separate files for HTML, CSS, and JavaScript modules.
 
@@ -513,10 +596,10 @@ See `src/ui/` for the modular UI implementation with separate files for HTML, CS
 Run the example app to test the config manager:
 
 ```bash
-bun dev
+bun example
 ```
 
-This starts the config manager on port 3000, managing the example app (`example/index.ts`) which runs on port 4000. Visit `http://localhost:3000` to access the config UI.
+This starts the config manager on port 3000, managing the example app (`example/index.ts`) which runs on port 8080. Visit `http://localhost:3000` to access the config UI.
 
 The example app demonstrates:
 
@@ -548,7 +631,32 @@ Here's a complete example of using process-pastry with a custom UI:
      --port 3000
    ```
 
-3. **Visit** `http://localhost:3000` to access your configuration interface.
+   Or with proxying to host both your app and config UI on the same port:
+
+   ```bash
+   bun run index.ts \
+     --cmd "bun run my-server.ts" \
+     --env .env \
+     --html ./config-ui.html \
+     --html-route /config \
+     --proxy-port 8080 \
+     --port 3000
+   ```
+
+   Or with a custom proxy host:
+
+   ```bash
+   bun run index.ts \
+     --cmd "bun run my-server.ts" \
+     --env .env \
+     --html ./config-ui.html \
+     --html-route /config \
+     --proxy-port 8080 \
+     --proxy-host 192.168.1.100 \
+     --port 3000
+   ```
+
+3. **Visit** `http://localhost:3000` (or `http://localhost:3000/config` if using a custom route) to access your configuration interface.
 
 ## Advanced: Programmatic API
 
@@ -565,6 +673,8 @@ startServer({
   htmlRoute: "/",
   htmlContent: uiHtml,
   exampleEnvPath: ".env.example", // optional
+  proxyPort: 8080, // optional - proxy unmatched requests to this port
+  proxyHost: "localhost", // optional - proxy host (default: "localhost")
 });
 ```
 

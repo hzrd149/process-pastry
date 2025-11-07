@@ -6,13 +6,15 @@ import { state, updateOriginalValues } from "./state.js";
 import { showAlert } from "./ui.js";
 import { renderEnvVars } from "./render.js";
 
+const API_PREFIX = "/process-pastry/api";
+
 /**
  * Load environment variable schema from the server
  * @returns {Promise<boolean>} Success status
  */
 export async function loadSchema() {
   try {
-    const res = await fetch("/api/example");
+    const res = await fetch(`${API_PREFIX}/example`);
     if (!res.ok) throw new Error("Failed to load schema");
     state.envSchema = await res.json();
     return true;
@@ -29,7 +31,7 @@ export async function loadSchema() {
  */
 export async function loadConfig() {
   try {
-    const res = await fetch("/api/config");
+    const res = await fetch(`${API_PREFIX}/config`);
     if (!res.ok) throw new Error("Failed to load config");
     state.envVars = await res.json();
     // Store original values for comparison
@@ -56,7 +58,7 @@ export async function updateStatus(
   errorLog,
 ) {
   try {
-    const res = await fetch("/api/status");
+    const res = await fetch(`${API_PREFIX}/status`);
     if (!res.ok) throw new Error("Failed to get status");
     const status = await res.json();
 
@@ -116,7 +118,7 @@ export async function saveConfig(
       headers["X-Restart-Process"] = "false";
     }
 
-    const res = await fetch("/api/config", {
+    const res = await fetch(`${API_PREFIX}/config`, {
       method: "POST",
       headers,
       body: JSON.stringify(currentVars),

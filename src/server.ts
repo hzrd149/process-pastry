@@ -8,6 +8,7 @@ import { readEnv, writeEnv, readEnvExample } from "./config-handler";
 const uiDir = join(import.meta.dir, "ui");
 
 const LOG_PREFIX = "[process-pastry]";
+const API_PREFIX = "/process-pastry/api";
 
 export interface ServerOptions {
   port: number;
@@ -17,6 +18,7 @@ export interface ServerOptions {
   htmlContent?: string | any; // HTML content to serve (from import or file path)
   exampleEnvPath?: string; // Path to .env.example file (auto-discovered if not provided)
   proxyPort?: number; // Port to proxy unmatched requests to (when custom HTML is provided)
+  proxyHost?: string; // Host to proxy unmatched requests to (default: "localhost")
 }
 
 export function startServer(options: ServerOptions): void {
@@ -28,6 +30,7 @@ export function startServer(options: ServerOptions): void {
     htmlContent,
     exampleEnvPath,
     proxyPort,
+    proxyHost = "localhost",
   } = options;
 
   // Initialize process manager
@@ -125,7 +128,7 @@ export function startServer(options: ServerOptions): void {
   }
 
   // Add API routes
-  routes["/api/config"] = {
+  routes[`${API_PREFIX}/config`] = {
     async GET() {
       const config = readEnv(envPath);
       return Response.json(config);
@@ -202,14 +205,14 @@ export function startServer(options: ServerOptions): void {
     },
   };
 
-  routes["/api/status"] = {
+  routes[`${API_PREFIX}/status`] = {
     GET() {
       const status = processManager.getStatus();
       return Response.json(status);
     },
   };
 
-  routes["/api/example"] = {
+  routes[`${API_PREFIX}/example`] = {
     GET() {
       try {
         const schema = readEnvExample(exampleEnvPath, envPath);
@@ -221,16 +224,21 @@ export function startServer(options: ServerOptions): void {
     },
   };
 
-  // Helper function to proxy requests to another port
-  async function proxyRequest(req: Request, targetPort: number): Promise<Response> {
+  // Helper function to proxy requests to another host/port
+  async function proxyRequest(
+    req: Request,
+    targetHost: string,
+    targetPort: number,
+  ): Promise<Response> {
     const url = new URL(req.url);
-    const targetUrl = `http://localhost:${targetPort}${url.pathname}${url.search}`;
+    const targetUrl = `http://${targetHost}:${targetPort}${url.pathname}${url.search}`;
 
     try {
       const proxyReq = new Request(targetUrl, {
         method: req.method,
         headers: req.headers,
-        body: req.method !== "GET" && req.method !== "HEAD" ? req.body : undefined,
+        body:
+          req.method !== "GET" && req.method !== "HEAD" ? req.body : undefined,
       });
 
       const response = await fetch(proxyReq);
@@ -245,15 +253,15 @@ export function startServer(options: ServerOptions): void {
   const server = serve({
     port,
     routes,
-    fetch(req) {
-      // If proxyPort is provided and custom HTML is used, proxy unmatched routes
-      if (proxyPort && htmlContent) {
+    async fetch(req) {
+      // If proxyPort is provided, proxy unmatched routes
+      if (proxyPort) {
         const url = new URL(req.url);
         const pathname = url.pathname;
 
         // Don't proxy API routes or the HTML route
         if (
-          pathname.startsWith("/api/") ||
+          pathname.startsWith(API_PREFIX + "/") ||
           pathname === htmlRoute ||
           pathname.startsWith(htmlRoute + "/")
         ) {
@@ -261,8 +269,8 @@ export function startServer(options: ServerOptions): void {
           return new Response("Not Found", { status: 404 });
         }
 
-        // Proxy all other requests to the target port
-        return proxyRequest(req, proxyPort);
+        // Proxy all other requests to the target host/port
+        return await proxyRequest(req, proxyHost, proxyPort);
       }
 
       // Handle any unmatched routes
@@ -278,9 +286,9 @@ export function startServer(options: ServerOptions): void {
   console.log(
     `${LOG_PREFIX} 🌐 UI available at http://localhost:${port}${htmlRoute}`,
   );
-  if (proxyPort && htmlContent) {
+  if (proxyPort) {
     console.log(
-      `${LOG_PREFIX} 🔀 Proxying unmatched requests to http://localhost:${proxyPort}`,
+      `${LOG_PREFIX} 🔀 Proxying unmatched requests to http://${proxyHost}:${proxyPort}`,
     );
   }
 }

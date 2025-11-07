@@ -103,7 +103,9 @@ export class ProcessManager {
       });
 
       if (childProcess.pid) {
-        console.log(`${LOG_PREFIX} ✓ Process started with PID ${childProcess.pid}`);
+        console.log(
+          `${LOG_PREFIX} ✓ Process started with PID ${childProcess.pid}`,
+        );
       }
     } catch (error) {
       this.lastError = `Failed to start process: ${error}`;

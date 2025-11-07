@@ -7,7 +7,8 @@
   "main": "index.ts",
   "scripts": {
     "format": "prettier -w .",
-    "dev": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --port 3000"
+    "example": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --port 3000",
+    "example:proxy": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --html-route /config --proxy-port 8080"
   },
   "bin": {
     "process-pastry": "./index.ts"

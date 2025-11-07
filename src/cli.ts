@@ -9,6 +9,7 @@ export interface CLIOptions {
   htmlRoute?: string;
   exampleEnv?: string;
   proxyPort?: string;
+  proxyHost?: string;
   help?: boolean;
 }
 
@@ -32,6 +33,8 @@ export function parseArgs(args: string[]): CLIOptions {
       options.exampleEnv = args[++i];
     } else if (arg === "--proxy-port") {
       options.proxyPort = args[++i];
+    } else if (arg === "--proxy-host") {
+      options.proxyHost = args[++i];
     } else if (arg === "--help") {
       options.help = true;
     }
@@ -51,7 +54,8 @@ Options:
   --html, -h <path>       Path to HTML file to serve as UI (optional)
   --html-route <path>     Route path for HTML UI (default: /)
   --example-env, -E <path> Path to .env.example file (auto-discovered if not provided)
-  --proxy-port <port>     Port to proxy unmatched requests to (only when custom HTML is provided)
+  --proxy-port <port>     Port to proxy unmatched requests to
+  --proxy-host <host>     Host to proxy unmatched requests to (default: localhost)
   --help                  Show this help message
 
 Examples:
@@ -59,6 +63,7 @@ Examples:
   process-pastry --cmd "bun run server.ts" --env config/.env --port 8080
   process-pastry --cmd "node app.js" --html ./ui.html --html-route /config
   process-pastry --cmd "node app.js" --html ./ui.html --html-route /config --proxy-port 4000
+  process-pastry --cmd "node app.js" --html ./ui.html --html-route /config --proxy-port 4000 --proxy-host 192.168.1.100
 `);
 }
 
@@ -118,5 +123,6 @@ export function runCLI(): void {
     htmlContent,
     exampleEnvPath: options.exampleEnv,
     proxyPort,
+    proxyHost: options.proxyHost,
   });
 }
