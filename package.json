@@ -1,6 +1,6 @@
 {
   "name": "process-pastry",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "A reusable Bun app for managing process configuration via a web UI",
   "module": "index.ts",
   "type": "module",
@@ -11,7 +11,8 @@
     "example:config": "bun run index.ts",
     "example:proxy": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --html-route /config --proxy-port 8080",
     "example:auth": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --auth-user admin --auth-password password",
-    "example:ssl": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --ssl"
+    "example:ssl": "bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --ssl",
+    "example:expose": "PORT=8080 bun run index.ts --cmd \"bun run example/index.ts\" --env example/.env --expose \"PORT\""
   },
   "bin": {
     "process-pastry": "./index.ts"

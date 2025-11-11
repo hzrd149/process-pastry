@@ -32,9 +32,19 @@ export async function loadSchema() {
 export async function loadExistingEnvVars() {
   try {
     const res = await fetch(`${API_PREFIX}/existing`);
-    if (!res.ok) throw new Error("Failed to load existing env vars");
+    if (!res.ok) {
+      // If 403, expose list is not configured - this is expected
+      if (res.status === 403) {
+        console.info("Expose list not configured - existing env vars not available");
+        state.existingEnvVars = new Set();
+        return true; // Not an error, just not configured
+      }
+      throw new Error("Failed to load existing env vars");
+    }
     const data = await res.json();
-    state.existingEnvVars = new Set(data.variables || []);
+    // New format: data is Record<string, string | undefined>
+    // Extract the keys (variable names) into a Set
+    state.existingEnvVars = new Set(Object.keys(data));
     return true;
   } catch (error) {
     console.warn("Failed to load existing env vars:", error);

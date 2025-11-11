@@ -17,6 +17,7 @@ export interface CLIOptions {
   sslCert?: string;
   sslKey?: string;
   sslHost?: string;
+  expose?: string[];
   help?: boolean;
   config?: string;
 }
@@ -95,6 +96,11 @@ export function parseArgs(args: string[]): CLIOptions {
       options.sslKey = args[++i];
     } else if (arg === "--ssl-host") {
       options.sslHost = args[++i];
+    } else if (arg === "--expose") {
+      // Parse comma-separated list of variable names
+      const exposeList = args[++i];
+      if (!exposeList) continue;
+      options.expose = exposeList.split(",").map((v) => v.trim());
     } else if (arg === "--config") {
       options.config = args[++i];
     } else if (arg === "--help") {
@@ -125,6 +131,7 @@ Options:
   --ssl-cert <path>       Path to SSL certificate file (optional, auto-generated if not provided)
   --ssl-key <path>        Path to SSL private key file (optional, auto-generated if not provided)
   --ssl-host <hostname>   Hostname for certificate (default: localhost)
+  --expose <vars>         Comma-separated list of env var names to expose values for (e.g., "NODE_ENV,PORT")
   --help                  Show this help message
 
 Config File:
@@ -140,7 +147,8 @@ Config File:
     "htmlRoute": "/",
     "proxyPort": "4000",
     "proxyHost": "localhost",
-    "ssl": true
+    "ssl": true,
+    "expose": ["NODE_ENV", "PORT", "API_VERSION"]
   }
 
 Examples:
@@ -264,6 +272,7 @@ export function runCLI(): void {
     sslCert: options.sslCert,
     sslKey: options.sslKey,
     sslHost: options.sslHost || "localhost",
+    expose: options.expose,
   }).catch((error) => {
     console.error("Failed to start server:", error);
     process.exit(1);

@@ -139,6 +139,7 @@ export interface ServerOptions {
   sslCert?: string; // Path to SSL certificate file (optional, auto-generated if not provided)
   sslKey?: string; // Path to SSL private key file (optional, auto-generated if not provided)
   sslHost?: string; // Hostname for certificate (default: "localhost")
+  expose?: string[]; // List of environment variable names to expose values for (optional)
 }
 
 export async function startServer(options: ServerOptions): Promise<void> {
@@ -157,6 +158,7 @@ export async function startServer(options: ServerOptions): Promise<void> {
     sslCert,
     sslKey,
     sslHost = "localhost",
+    expose = [],
   } = options;
 
   // Get SSL certificates if SSL is enabled
@@ -348,9 +350,25 @@ export async function startServer(options: ServerOptions): Promise<void> {
 
   routes[`${API_PREFIX}/existing`] = {
     GET() {
-      // Return only the names of existing environment variables (not values for security)
-      const variables = Object.keys(process.env);
-      return Response.json({ variables });
+      // Only return values if expose list is configured
+      if (expose.length === 0) {
+        return Response.json(
+          {
+            error:
+              "No expose list configured. Use --expose to specify which environment variables to expose.",
+          },
+          { status: 403 },
+        );
+      }
+
+      // Return filtered variables with values
+      const exposedVars: Record<string, string | undefined> = {};
+      expose.forEach((varName) => {
+        if (process.env[varName] !== undefined) {
+          exposedVars[varName] = process.env[varName];
+        }
+      });
+      return Response.json(exposedVars);
     },
   };
 

@@ -14,6 +14,7 @@ A CLI tool built with Bun that provides a web-based configuration interface for 
 - 📝 **Schema Support** - Optional `.env.example` file for variable descriptions and defaults
 - 🔀 **Request Proxying** - Proxy unmatched requests to another port when using custom UI
 - 🔒 **HTTP Basic Auth** - Optional authentication to protect the config UI and API endpoints
+- 🛡️ **Selective Exposure** - Safely expose specific environment variable values to custom config UIs
 
 ## Installation
 
@@ -163,6 +164,9 @@ bun run index.ts --cmd "node app.js" --html ./config-ui.html --html-route /confi
 # With custom proxy host and port
 bun run index.ts --cmd "node app.js" --proxy-port 8080 --proxy-host 192.168.1.100
 
+# With expose list and custom UI
+bun run index.ts --cmd "node app.js" --html ./config-ui.html --expose "NODE_ENV,PORT,API_VERSION"
+
 # With HTTP Basic Auth (protects all routes)
 bun run index.ts --cmd "node app.js" --auth-user admin --auth-password secret
 
@@ -174,6 +178,9 @@ bun run index.ts --cmd "node app.js" --env .env --ssl
 
 # With SSL/HTTPS using custom certificate
 bun run index.ts --cmd "node app.js" --env .env --ssl --ssl-cert ./cert.pem --ssl-key ./key.pem
+
+# Expose specific env var values to custom config apps
+bun run index.ts --cmd "node app.js" --env .env --expose "NODE_ENV,PORT,API_VERSION"
 
 # Using config file (process-pastry.json) - all options from config
 bun run index.ts
@@ -205,7 +212,8 @@ Instead of specifying all options via CLI arguments, you can create a `process-p
   "ssl": true,
   "sslCert": "./cert.pem",
   "sslKey": "./key.pem",
-  "sslHost": "localhost"
+  "sslHost": "localhost",
+  "expose": ["NODE_ENV", "PORT", "API_VERSION"]
 }
 ```
 
@@ -247,6 +255,7 @@ bun run index.ts --port 8080  # Overrides port from config file
 - `--ssl-cert <path>` - Path to SSL certificate file (optional, auto-generated if not provided)
 - `--ssl-key <path>` - Path to SSL private key file (optional, auto-generated if not provided)
 - `--ssl-host <hostname>` - Hostname for certificate (default: `localhost`)
+- `--expose <vars>` - Comma-separated list of environment variable names to expose values for (e.g., `"NODE_ENV,PORT,API_VERSION"`)
 - `--help` - Show help message
 
 ## API Endpoints
@@ -362,17 +371,28 @@ Returns the schema metadata from `.env.example` file (if available). This includ
 
 ### `GET /process-pastry/api/existing`
 
-Returns the names of environment variables that already exist in `process.env`. This is useful for identifying which variables from your `.env` file will override existing system/environment variables.
+Returns the values of exposed environment variables that exist in `process.env`. **Requires `--expose` to be configured.**
 
-**Response:**
+**With expose list (`--expose`):**
 
 ```json
 {
-  "variables": ["PATH", "HOME", "USER", "NODE_ENV", "PORT"]
+  "NODE_ENV": "production",
+  "PORT": "3000",
+  "API_VERSION": "v1"
 }
 ```
 
-**Note:** Only variable names are returned (not values) for security reasons. Variables listed here are those that exist in the parent process's environment and will be overridden by variables with the same name in your `.env` file.
+**Without expose list:**
+Returns a 403 Forbidden error to prevent accidental exposure of all environment variables.
+
+```json
+{
+  "error": "No expose list configured. Use --expose to specify which environment variables to expose."
+}
+```
+
+**Note:** Only variables specified in the expose list AND that exist in `process.env` will be returned with their values. This provides a safe way to expose specific values to custom config apps without accidentally leaking sensitive information like API keys or database passwords.
 
 ## Creating a Custom Config UI
 
@@ -484,21 +504,39 @@ All endpoints are served at `/process-pastry/api/*`:
 
 #### `GET /process-pastry/api/existing`
 
-- **Purpose**: Get list of environment variable names that exist in `process.env`
-- **Response**: `{ variables: string[] }` - Array of variable names (values not included for security)
-- **Example**:
+- **Purpose**: Get exposed environment variables from `process.env` (**requires `--expose`**)
+- **Response**:
+  - With expose list: `Record<string, string | undefined>` - Object with exposed variable values
+  - Without expose list: 403 Forbidden error
+- **Example with expose list** (when started with `--expose "NODE_ENV,PORT,API_VERSION"`):
 
   ```javascript
   const response = await fetch("/process-pastry/api/existing");
-  const data = await response.json();
-  // { variables: ["PATH", "HOME", "USER", "NODE_ENV", "PORT"] }
 
-  // Check if a variable will override an existing one
-  const willOverride = data.variables.includes("PORT");
-  if (willOverride) {
-    console.warn("PORT will override an existing environment variable");
+  if (!response.ok) {
+    console.error("Expose list not configured");
+    return;
   }
+
+  const exposedVars = await response.json();
+  // { "NODE_ENV": "production", "PORT": "3000", "API_VERSION": "v1" }
+
+  // Use exposed values in your custom UI
+  if (exposedVars.NODE_ENV === "production") {
+    console.log("Running in production mode");
+  }
+  console.log(`Server running on port ${exposedVars.PORT}`);
   ```
+
+- **Example without expose list**:
+
+  ```javascript
+  const response = await fetch("/process-pastry/api/existing");
+  // Response status: 403
+  // Response body: { "error": "No expose list configured. Use --expose to specify which environment variables to expose." }
+  ```
+
+- **Note**: Only variables specified in the expose list AND that exist in `process.env` will be returned with their values. This provides a secure way to expose specific environment values to custom config UIs without accidentally leaking sensitive information like API keys or database passwords.
 
 ### Basic HTML Template
 
@@ -783,6 +821,59 @@ Object.keys(config).forEach((key) => {
 });
 ```
 
+#### Accessing Exposed Environment Variables
+
+You can safely access specific environment variable values by using the `--expose` option. This enables the `/process-pastry/api/existing` endpoint to return exposed values from `process.env`:
+
+**Start process-pastry with an expose list:**
+
+```bash
+bun run index.ts \
+  --cmd "node app.js" \
+  --env .env \
+  --html ./custom-ui.html \
+  --expose "NODE_ENV,PORT,API_VERSION"
+```
+
+**Access exposed values in your custom UI:**
+
+```javascript
+// Load exposed environment variables from process.env
+const existingRes = await fetch("/process-pastry/api/existing");
+
+if (!existingRes.ok) {
+  console.error(
+    "No expose list configured - cannot access environment variables",
+  );
+  return;
+}
+
+const existingVars = await existingRes.json();
+// { "NODE_ENV": "production", "PORT": "3000", "API_VERSION": "v1" }
+
+// Use the values in your UI
+if (existingVars.NODE_ENV === "production") {
+  document.getElementById("env-badge").textContent = "PROD";
+  document.getElementById("env-badge").className = "badge-red";
+} else {
+  document.getElementById("env-badge").textContent = "DEV";
+  document.getElementById("env-badge").className = "badge-green";
+}
+
+// Display server info
+document.getElementById("server-port").textContent =
+  existingVars.PORT || "Unknown";
+document.getElementById("api-version").textContent =
+  existingVars.API_VERSION || "Unknown";
+```
+
+**Security Benefits:**
+
+- **Requires explicit expose list** - endpoint returns 403 error without `--expose`
+- Only exposed variables are returned - prevents accidental leakage of sensitive data
+- API keys, database passwords, and other secrets remain hidden
+- Custom config UIs can access necessary values without full environment access
+
 #### Skipping Process Restart
 
 To save config without restarting the process:
@@ -1010,6 +1101,7 @@ startServer({
   proxyHost: "localhost", // optional - proxy host (default: "localhost")
   authUser: "admin", // optional - username for HTTP Basic Auth
   authPassword: "secret", // optional - password for HTTP Basic Auth
+  expose: ["NODE_ENV", "PORT", "API_VERSION"], // optional - list of env vars to expose
 });
 ```
 
